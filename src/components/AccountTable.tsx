@@ -260,10 +260,29 @@ const AccountTable = forwardRef<AccountTableRef, AccountTableProps>(({
         return acc;
       }, {} as Record<string, number>);
 
+      // Fetch deal counts by matching customer_name to company_name
+      const { data: dealsData } = await supabase
+        .from('deals')
+        .select('customer_name, total_contract_value');
+
+      // Calculate deal counts and total revenue per company
+      const dealStatsMap: Record<string, { count: number; revenue: number }> = {};
+      (dealsData || []).forEach(deal => {
+        if (deal.customer_name) {
+          if (!dealStatsMap[deal.customer_name]) {
+            dealStatsMap[deal.customer_name] = { count: 0, revenue: 0 };
+          }
+          dealStatsMap[deal.customer_name].count += 1;
+          dealStatsMap[deal.customer_name].revenue += deal.total_contract_value || 0;
+        }
+      });
+
       // Merge actual counts into accounts
       const accountsWithCounts = (accountsData || []).map(account => ({
         ...account,
         contact_count: contactCountMap[account.id] || 0,
+        deal_count: dealStatsMap[account.company_name]?.count || 0,
+        total_revenue: dealStatsMap[account.company_name]?.revenue || account.total_revenue || 0,
       }));
 
       setAccounts(accountsWithCounts);

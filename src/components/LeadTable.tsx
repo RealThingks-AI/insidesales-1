@@ -21,7 +21,7 @@ import { LeadColumnCustomizer, LeadColumnConfig, defaultLeadColumns } from "./Le
 import { LeadStatusFilter } from "./LeadStatusFilter";
 import { ConvertToDealModal } from "./ConvertToDealModal";
 import { LeadDeleteConfirmDialog } from "./LeadDeleteConfirmDialog";
-import { AccountViewModal } from "./AccountViewModal";
+import { AccountDetailModalById } from "./accounts/AccountDetailModalById";
 import { SendEmailModal, EmailRecipient } from "./SendEmailModal";
 import { MeetingModal } from "./MeetingModal";
 import { TaskModal } from "./tasks/TaskModal";
@@ -910,7 +910,7 @@ const LeadTable = forwardRef<LeadTableRef, LeadTableProps>(({
         leadName={leadToDelete?.lead_name} 
       />
 
-      <AccountViewModal 
+      <AccountDetailModalById 
         open={accountViewOpen} 
         onOpenChange={setAccountViewOpen} 
         accountId={viewAccountId} 
