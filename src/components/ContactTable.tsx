@@ -18,7 +18,7 @@ import { RowActionsDropdown, Edit, Trash2, Mail, UserPlus } from "./RowActionsDr
 import { ContactModal } from "./ContactModal";
 import { ContactColumnCustomizer, ContactColumnConfig, defaultContactColumns } from "./ContactColumnCustomizer";
 import { ContactDetailModal } from "./contacts/ContactDetailModal";
-import { AccountViewModal } from "./AccountViewModal";
+import { AccountDetailModalById } from "./accounts/AccountDetailModalById";
 import { SendEmailModal } from "./SendEmailModal";
 import { MeetingModal } from "./MeetingModal";
 import { HighlightedText } from "./shared/HighlightedText";
@@ -966,7 +966,7 @@ export const ContactTable = forwardRef<ContactTableRef, ContactTableProps>(({
       </AlertDialog>
 
       {/* Account View Modal */}
-      <AccountViewModal open={accountViewOpen} onOpenChange={setAccountViewOpen} accountId={viewAccountId} />
+      <AccountDetailModalById open={accountViewOpen} onOpenChange={setAccountViewOpen} accountId={viewAccountId} />
 
       {/* Send Email Modal */}
       <SendEmailModal

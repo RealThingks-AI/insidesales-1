@@ -23,13 +23,16 @@ import {
   Mail,
   Send,
   History,
-  Pencil
+  Pencil,
+  CalendarPlus,
+  CheckSquare
 } from "lucide-react";
 import { format } from "date-fns";
 import { AccountActivityTimeline } from "./AccountActivityTimeline";
 import { AccountAssociations } from "./AccountAssociations";
 import { ActivityLogModal } from "./ActivityLogModal";
 import { AccountScoreBadge, AccountSegmentBadge } from "./AccountScoreBadge";
+import { getAccountStatusColor } from "@/utils/accountStatusUtils";
 
 interface Account {
   id: string;
@@ -60,6 +63,7 @@ interface AccountDetailModalProps {
 export const AccountDetailModal = ({ open, onOpenChange, account, onUpdate, onEdit }: AccountDetailModalProps) => {
   const { toast } = useToast();
   const [showActivityLog, setShowActivityLog] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   if (!account) return null;
@@ -67,28 +71,6 @@ export const AccountDetailModal = ({ open, onOpenChange, account, onUpdate, onEd
   const handleActivityLogged = () => {
     setRefreshKey(prev => prev + 1);
     onUpdate?.();
-  };
-
-  // Match status colors with AccountTable.tsx
-  const getStatusColor = (status: string | null) => {
-    switch (status) {
-      case 'Hot':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800';
-      case 'Warm':
-        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border border-orange-200 dark:border-orange-800';
-      case 'Working':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800';
-      case 'Nurture':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 border border-purple-200 dark:border-purple-800';
-      case 'Closed-Won':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800';
-      case 'Closed-Lost':
-        return 'bg-gray-100 text-gray-600 dark:bg-gray-800/50 dark:text-gray-400 border border-gray-200 dark:border-gray-700';
-      case 'New':
-        return 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-800';
-      default:
-        return 'bg-muted text-muted-foreground border border-border';
-    }
   };
 
   return (
@@ -103,7 +85,7 @@ export const AccountDetailModal = ({ open, onOpenChange, account, onUpdate, onEd
                   {account.company_name}
                 </DialogTitle>
                 <div className="flex items-center gap-2 mt-2">
-                  <Badge className={getStatusColor(account.status)}>
+                  <Badge className={getAccountStatusColor(account.status)}>
                     {account.status || 'New'}
                   </Badge>
                   <AccountSegmentBadge segment={account.segment || 'prospect'} />
@@ -111,6 +93,17 @@ export const AccountDetailModal = ({ open, onOpenChange, account, onUpdate, onEd
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {account.email && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowEmailModal(true)}
+                    className="gap-2"
+                  >
+                    <Mail className="h-4 w-4" />
+                    Email
+                  </Button>
+                )}
                 {onEdit && (
                   <Button
                     variant="outline"
@@ -140,7 +133,7 @@ export const AccountDetailModal = ({ open, onOpenChange, account, onUpdate, onEd
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="timeline">Activity</TabsTrigger>
               <TabsTrigger value="emails">Emails</TabsTrigger>
-              <TabsTrigger value="associations">Contacts</TabsTrigger>
+              <TabsTrigger value="associations">Related</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="space-y-4 mt-4">
@@ -267,6 +260,16 @@ export const AccountDetailModal = ({ open, onOpenChange, account, onUpdate, onEd
         onOpenChange={setShowActivityLog}
         accountId={account.id}
         onSuccess={handleActivityLogged}
+      />
+
+      <SendEmailModal
+        open={showEmailModal}
+        onOpenChange={setShowEmailModal}
+        recipient={account.email ? {
+          name: account.company_name,
+          email: account.email,
+          company_name: account.company_name
+        } : null}
       />
     </>
   );

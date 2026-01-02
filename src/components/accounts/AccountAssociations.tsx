@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { User, Briefcase, ExternalLink, Loader2, Mail, Phone } from "lucide-react";
+import { User, Briefcase, ExternalLink, Loader2, Mail, Phone, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface Contact {
@@ -41,7 +41,6 @@ export const AccountAssociations = ({ accountId, companyName }: AccountAssociati
   const fetchAssociations = async () => {
     setLoading(true);
     try {
-      // Fetch contacts linked to this account
       const { data: contactData } = await supabase
         .from('contacts')
         .select('id, contact_name, email, phone_no, position')
@@ -50,7 +49,6 @@ export const AccountAssociations = ({ accountId, companyName }: AccountAssociati
 
       setContacts(contactData || []);
 
-      // Fetch deals where customer_name matches company_name
       if (companyName) {
         const { data: dealData } = await supabase
           .from('deals')
@@ -94,16 +92,33 @@ export const AccountAssociations = ({ accountId, companyName }: AccountAssociati
       {/* Contacts */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <User className="h-4 w-4" />
-            Contacts ({contacts.length})
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Contacts ({contacts.length})
+            </CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/contacts')}
+              className="h-7 gap-1 text-xs"
+            >
+              <Plus className="h-3 w-3" />
+              Add
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {contacts.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No contacts linked to this account
-            </p>
+            <div className="text-center py-6 space-y-3">
+              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto">
+                <User className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">No contacts yet</p>
+                <p className="text-xs text-muted-foreground">Add contacts to track relationships</p>
+              </div>
+            </div>
           ) : (
             <ScrollArea className="h-[200px]">
               <div className="space-y-2">
@@ -139,38 +154,58 @@ export const AccountAssociations = ({ accountId, companyName }: AccountAssociati
               </div>
             </ScrollArea>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full mt-3"
-            onClick={() => navigate('/contacts')}
-          >
-            View All Contacts
-            <ExternalLink className="h-3 w-3 ml-1" />
-          </Button>
+          {contacts.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full mt-3"
+              onClick={() => navigate('/contacts')}
+            >
+              View All Contacts
+              <ExternalLink className="h-3 w-3 ml-1" />
+            </Button>
+          )}
         </CardContent>
       </Card>
 
       {/* Deals */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Briefcase className="h-4 w-4" />
-            Deals ({deals.length})
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Briefcase className="h-4 w-4" />
+              Deals ({deals.length})
+            </CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/deals')}
+              className="h-7 gap-1 text-xs"
+            >
+              <Plus className="h-3 w-3" />
+              Add
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {deals.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No deals linked to this account
-            </p>
+            <div className="text-center py-6 space-y-3">
+              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto">
+                <Briefcase className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">No deals yet</p>
+                <p className="text-xs text-muted-foreground">Create deals to track opportunities</p>
+              </div>
+            </div>
           ) : (
             <ScrollArea className="h-[200px]">
               <div className="space-y-2">
                 {deals.map((deal) => (
                   <div
                     key={deal.id}
-                    className="flex items-center justify-between p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                    className="flex items-center justify-between p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
+                    onClick={() => navigate(`/deals?viewId=${deal.id}`)}
                   >
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-sm truncate">{deal.deal_name}</p>
@@ -188,15 +223,17 @@ export const AccountAssociations = ({ accountId, companyName }: AccountAssociati
               </div>
             </ScrollArea>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full mt-3"
-            onClick={() => navigate('/deals')}
-          >
-            View All Deals
-            <ExternalLink className="h-3 w-3 ml-1" />
-          </Button>
+          {deals.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full mt-3"
+              onClick={() => navigate('/deals')}
+            >
+              View All Deals
+              <ExternalLink className="h-3 w-3 ml-1" />
+            </Button>
+          )}
         </CardContent>
       </Card>
     </div>
