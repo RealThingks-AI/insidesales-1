@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Deal, DealStage, DEAL_STAGES, STAGE_COLORS } from "@/types/deal";
-import { Search, Filter, X, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Briefcase } from "lucide-react";
+import { Search, Filter, X, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Briefcase, Edit3 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RowActionsDropdown, Edit, Trash2, CheckSquare } from "./RowActionsDropdown";
 import { format } from "date-fns";
@@ -15,6 +15,7 @@ import { BulkActionsBar } from "./BulkActionsBar";
 import { DealsAdvancedFilter, AdvancedFilterState } from "./DealsAdvancedFilter";
 import { TaskModal } from "./tasks/TaskModal";
 import { useTasks } from "@/hooks/useTasks";
+import { InlineEditCell } from "./InlineEditCell";
 
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
@@ -34,6 +35,7 @@ interface ListViewProps {
   onDeleteDeals: (dealIds: string[]) => void;
   onImportDeals: (deals: Partial<Deal>[]) => void;
   initialStageFilter?: string;
+  onSelectionChange?: (selectedIds: string[]) => void;
 }
 
 export const ListView = ({ 
@@ -42,7 +44,8 @@ export const ListView = ({
   onUpdateDeal, 
   onDeleteDeals, 
   onImportDeals,
-  initialStageFilter = 'all'
+  initialStageFilter = 'all',
+  onSelectionChange
 }: ListViewProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [leadOwnerFilter, setLeadOwnerFilter] = useState("all");
@@ -74,6 +77,11 @@ export const ListView = ({
       setFilters(prev => ({ ...prev, stages: [initialStageFilter as DealStage] }));
     }
   }, [initialStageFilter]);
+
+  // Notify parent of selection changes
+  useEffect(() => {
+    onSelectionChange?.(Array.from(selectedDeals));
+  }, [selectedDeals, onSelectionChange]);
   
   // Task Modal state
   const [taskModalOpen, setTaskModalOpen] = useState(false);
@@ -186,9 +194,12 @@ export const ListView = ({
     return name.split(' ').slice(0, 2).map(word => word.charAt(0).toUpperCase()).join('');
   };
 
-  // Generate consistent color from project name
+  // Generate consistent vibrant color from project name
   const getAvatarColor = (name: string) => {
-    const colors = ['bg-slate-500', 'bg-slate-600', 'bg-zinc-500', 'bg-gray-500', 'bg-stone-500', 'bg-neutral-500', 'bg-slate-700', 'bg-zinc-600'];
+    const colors = [
+      'bg-blue-600', 'bg-emerald-600', 'bg-purple-600', 'bg-amber-600', 
+      'bg-rose-600', 'bg-cyan-600', 'bg-indigo-600', 'bg-teal-600'
+    ];
     const index = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
     return colors[index];
   };
@@ -295,6 +306,43 @@ export const ListView = ({
   };
 
   const handleInlineEdit = async (dealId: string, field: string, value: any) => {
+    // Validation
+    if (field === 'probability') {
+      const numValue = Number(value);
+      if (isNaN(numValue) || numValue < 0 || numValue > 100) {
+        toast({
+          title: "Validation error",
+          description: "Probability must be between 0 and 100",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    
+    if (field === 'priority') {
+      const numValue = Number(value);
+      if (isNaN(numValue) || numValue < 1 || numValue > 5) {
+        toast({
+          title: "Validation error",
+          description: "Priority must be between 1 and 5",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    
+    if (['total_contract_value', 'total_revenue'].includes(field)) {
+      const numValue = Number(value);
+      if (isNaN(numValue) || numValue < 0) {
+        toast({
+          title: "Validation error",
+          description: "Amount must be a positive number",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    
     try {
       await onUpdateDeal(dealId, { [field]: value });
       toast({
@@ -314,13 +362,33 @@ export const ListView = ({
     if (field === 'stage') return 'stage';
     if (field === 'priority') return 'priority';
     if (field === 'lead_owner') return 'userSelect';
-    if (['total_contract_value', 'total_revenue'].includes(field)) return 'currency';
-    if (['expected_closing_date', 'start_date', 'end_date', 'proposal_due_date'].includes(field)) return 'date';
+    if (['total_contract_value', 'total_revenue', 'quarterly_revenue_q1', 'quarterly_revenue_q2', 'quarterly_revenue_q3', 'quarterly_revenue_q4'].includes(field)) return 'currency';
+    if (['expected_closing_date', 'start_date', 'end_date', 'proposal_due_date', 'rfq_received_date', 'signed_contract_date', 'implementation_start_date'].includes(field)) return 'date';
     if (['probability', 'project_duration'].includes(field)) return 'number';
+    if (['handoff_status', 'rfq_status', 'is_recurring', 'relationship_strength', 'region', 'decision_maker_level'].includes(field)) return 'select';
     return 'text';
   };
 
   const getFieldOptions = (field: string): string[] => {
+    if (field === 'handoff_status') {
+      return ['Not Started', 'In Progress', 'Complete'];
+    }
+    if (field === 'rfq_status') {
+      return ['Drafted', 'Submitted', 'Rejected', 'Accepted'];
+    }
+    if (field === 'is_recurring') {
+      return ['Yes', 'No', 'Unclear'];
+    }
+    if (field === 'relationship_strength') {
+      return ['Low', 'Medium', 'High'];
+    }
+    if (field === 'decision_maker_level') {
+      return ['Executive', 'Director', 'Manager', 'Individual Contributor'];
+    }
+    if (field === 'region') {
+      const regions = [...new Set(deals.map(d => d.region).filter(Boolean))] as string[];
+      return regions.length > 0 ? regions : ['North', 'South', 'East', 'West', 'Central'];
+    }
     return [];
   };
 
@@ -534,7 +602,7 @@ export const ListView = ({
       </div>
 
       <Card className="flex-1 min-h-0 flex flex-col">
-        <div className="relative overflow-auto flex-1">
+        <div className="relative overflow-auto flex-1 min-h-0">
         <Table ref={tableRef} className="w-full">
           <TableHeader>
             <TableRow className="sticky top-0 z-20 bg-muted border-b-2">
@@ -614,7 +682,7 @@ export const ListView = ({
                   {visibleColumns.map(column => (
                     <TableCell 
                       key={column.field} 
-                      className="text-left px-4 py-3 align-middle whitespace-nowrap overflow-hidden text-ellipsis"
+                      className="text-left px-2 py-1 align-middle whitespace-nowrap overflow-visible"
                       style={{ 
                         width: `${columnWidths[column.field] || 120}px`,
                         minWidth: `${columnWidths[column.field] || 120}px`,
@@ -622,65 +690,36 @@ export const ListView = ({
                       }}
                     >
                       {column.field === 'project_name' || column.field === 'deal_name' ? (
-                        deal[column.field as keyof Deal] ? (
+                        <div className="group flex items-center gap-1">
                           <button 
                             onClick={() => onDealClick(deal)}
                             className="text-primary hover:underline font-medium text-left truncate"
-                            title={deal[column.field as keyof Deal]?.toString()}
+                            title={deal[column.field as keyof Deal]?.toString() || 'Click to view'}
                           >
-                            <HighlightedText text={deal[column.field as keyof Deal]?.toString() || ''} highlight={searchTerm} />
+                            <HighlightedText text={deal[column.field as keyof Deal]?.toString() || '-'} highlight={searchTerm} />
                           </button>
-                        ) : (
-                          <span className="text-center text-muted-foreground w-full block">-</span>
-                        )
-                      ) : column.field === 'customer_name' ? (
-                        <span className={`truncate block ${!deal.customer_name ? 'text-center text-muted-foreground' : ''}`}>
-                          {deal.customer_name ? <HighlightedText text={deal.customer_name} highlight={searchTerm} /> : '-'}
-                        </span>
-                      ) : column.field === 'lead_name' ? (
-                        <span className={`truncate block ${!deal.lead_name ? 'text-center text-muted-foreground' : ''}`}>
-                          {deal.lead_name ? <HighlightedText text={deal.lead_name} highlight={searchTerm} /> : '-'}
-                        </span>
-                      ) : column.field === 'stage' ? (
-                        deal.stage ? (
-                          <Badge variant="outline" className={`whitespace-nowrap ${getStageBadgeClasses(deal.stage)}`}>
-                            {deal.stage}
-                          </Badge>
-                        ) : <span className="text-center text-muted-foreground block">-</span>
-                      ) : column.field === 'priority' ? (
-                        <span className={`truncate block ${!deal.priority ? 'text-center text-muted-foreground' : ''}`}>
-                          {deal.priority ? `${deal.priority} (${getPriorityLabel(deal.priority)})` : '-'}
-                        </span>
-                      ) : column.field === 'total_contract_value' || column.field === 'total_revenue' ? (
-                        deal[column.field as keyof Deal] ? (
-                          <span className="font-medium">{formatCurrency(deal[column.field as keyof Deal] as number, deal.currency_type)}</span>
-                        ) : (
-                          <span className="text-center text-muted-foreground w-full block">-</span>
-                        )
-                      ) : column.field === 'probability' ? (
-                        <span className={`${
-                          deal.probability != null ? (
-                            (deal.probability || 0) >= 70 ? 'font-medium text-green-600 dark:text-green-400' : 
-                            (deal.probability || 0) >= 40 ? 'font-medium text-amber-600 dark:text-amber-400' : 
-                            'font-medium text-muted-foreground'
-                          ) : 'text-center text-muted-foreground'
-                        }`}>
-                          {deal.probability != null ? `${deal.probability}%` : '-'}
-                        </span>
-                      ) : column.field === 'expected_closing_date' || column.field === 'start_date' || column.field === 'end_date' || column.field === 'proposal_due_date' ? (
-                        <span className={`truncate block ${!deal[column.field as keyof Deal] ? 'text-center text-muted-foreground' : ''}`}>{formatDate(deal[column.field as keyof Deal] as string)}</span>
-                      ) : column.field === 'lead_owner' ? (
-                        <span className={`truncate block ${!deal.lead_owner ? 'text-center text-muted-foreground' : ''}`}>
-                          {deal.lead_owner || '-'}
-                        </span>
-                      ) : column.field === 'region' ? (
-                        <span className={`truncate block ${!deal.region ? 'text-center text-muted-foreground' : ''}`}>{deal.region || '-'}</span>
-                      ) : column.field === 'project_duration' ? (
-                        <span className={`truncate block ${!deal.project_duration ? 'text-center text-muted-foreground' : ''}`}>{deal.project_duration ? `${deal.project_duration} months` : '-'}</span>
+                          <button
+                            className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 p-0.5 hover:bg-muted rounded"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDealClick(deal);
+                            }}
+                            title="Edit"
+                          >
+                            <Edit3 className="w-3 h-3 text-muted-foreground" />
+                          </button>
+                        </div>
                       ) : (
-                        <span title={deal[column.field as keyof Deal]?.toString() || '-'} className={`truncate block ${!deal[column.field as keyof Deal] ? 'text-center text-muted-foreground' : ''}`}>
-                          {deal[column.field as keyof Deal]?.toString() || '-'}
-                        </span>
+                        <InlineEditCell
+                          value={deal[column.field as keyof Deal]}
+                          field={column.field}
+                          dealId={deal.id}
+                          onSave={handleInlineEdit}
+                          type={getFieldType(column.field)}
+                          options={getFieldOptions(column.field)}
+                          userOptions={allProfiles}
+                          currencyType={deal.currency_type}
+                        />
                       )}
                     </TableCell>
                   ))}
@@ -718,21 +757,9 @@ export const ListView = ({
           </TableBody>
           </Table>
         </div>
-      </Card>
-
-      {/* Bulk Actions */}
-      {selectedDeals.size > 0 && (
-        <BulkActionsBar
-          selectedCount={selectedDeals.size}
-          onDelete={handleBulkDelete}
-          onExport={handleBulkExport}
-          onClearSelection={() => setSelectedDeals(new Set())}
-        />
-      )}
-
-      {/* Pagination */}
-      {totalPages > 0 && (
-        <div className="flex items-center justify-between">
+        
+        {/* Pagination */}
+        <div className="flex items-center justify-between p-4 border-t flex-shrink-0">
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">
               Showing {filteredAndSortedDeals.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredAndSortedDeals.length)} of {filteredAndSortedDeals.length} deals
@@ -743,7 +770,7 @@ export const ListView = ({
               variant="outline" 
               size="sm" 
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} 
-              disabled={currentPage === 1}
+              disabled={currentPage === 1 || totalPages === 0}
             >
               <ChevronLeft className="w-4 h-4" />
               Previous
@@ -762,6 +789,16 @@ export const ListView = ({
             </Button>
           </div>
         </div>
+      </Card>
+
+      {/* Bulk Actions */}
+      {selectedDeals.size > 0 && (
+        <BulkActionsBar
+          selectedCount={selectedDeals.size}
+          onDelete={handleBulkDelete}
+          onExport={handleBulkExport}
+          onClearSelection={() => setSelectedDeals(new Set())}
+        />
       )}
 
       <TaskModal

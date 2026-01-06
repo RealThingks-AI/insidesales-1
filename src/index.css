@@ -239,10 +239,14 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
+  html {
+    font-size: 90%;
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    font-size: 14px;
+    font-size: 0.875rem;
     line-height: 1.5;
   }
 

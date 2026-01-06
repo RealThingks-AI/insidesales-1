@@ -1,13 +1,10 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { EntityEmailHistory } from "@/components/shared/EntityEmailHistory";
-import { SendEmailModal } from "@/components/SendEmailModal";
+import { RelatedTasksSection } from "@/components/shared/RelatedTasksSection";
 import { 
   Building2, 
   Globe, 
@@ -15,23 +12,16 @@ import {
   MapPin, 
   Factory,
   Clock,
-  Users,
-  Briefcase,
   Plus,
   ExternalLink,
-  Loader2,
   Mail,
-  Send,
-  History,
   Pencil,
-  CalendarPlus,
-  CheckSquare
+  ListTodo
 } from "lucide-react";
 import { format } from "date-fns";
 import { AccountActivityTimeline } from "./AccountActivityTimeline";
 import { AccountAssociations } from "./AccountAssociations";
 import { ActivityLogModal } from "./ActivityLogModal";
-import { AccountScoreBadge, AccountSegmentBadge } from "./AccountScoreBadge";
 import { getAccountStatusColor } from "@/utils/accountStatusUtils";
 
 interface Account {
@@ -46,8 +36,6 @@ interface Account {
   status?: string | null;
   notes?: string | null;
   company_type?: string | null;
-  score?: number | null;
-  segment?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 }
@@ -61,9 +49,7 @@ interface AccountDetailModalProps {
 }
 
 export const AccountDetailModal = ({ open, onOpenChange, account, onUpdate, onEdit }: AccountDetailModalProps) => {
-  const { toast } = useToast();
   const [showActivityLog, setShowActivityLog] = useState(false);
-  const [showEmailModal, setShowEmailModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   if (!account) return null;
@@ -88,22 +74,9 @@ export const AccountDetailModal = ({ open, onOpenChange, account, onUpdate, onEd
                   <Badge className={getAccountStatusColor(account.status)}>
                     {account.status || 'New'}
                   </Badge>
-                  <AccountSegmentBadge segment={account.segment || 'prospect'} />
-                  <AccountScoreBadge score={account.score || 0} />
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {account.email && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowEmailModal(true)}
-                    className="gap-2"
-                  >
-                    <Mail className="h-4 w-4" />
-                    Email
-                  </Button>
-                )}
                 {onEdit && (
                   <Button
                     variant="outline"
@@ -131,79 +104,71 @@ export const AccountDetailModal = ({ open, onOpenChange, account, onUpdate, onEd
           <Tabs defaultValue="overview" className="w-full">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="tasks" className="flex items-center gap-1">
+                <ListTodo className="h-3 w-3" />
+                Tasks
+              </TabsTrigger>
               <TabsTrigger value="timeline">Activity</TabsTrigger>
-              <TabsTrigger value="emails">Emails</TabsTrigger>
               <TabsTrigger value="associations">Related</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="space-y-4 mt-4">
-              {/* Account Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Company Details</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {account.website && (
+              {/* Account Info - 2 Column Grid */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Company Details</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {account.email && (
                       <div className="flex items-center gap-2 text-sm">
-                        <Globe className="h-4 w-4 text-muted-foreground" />
-                        <a 
-                          href={account.website.startsWith('http') ? account.website : `https://${account.website}`} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline"
-                        >
-                          {account.website}
-                        </a>
+                        <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <span className="truncate">{account.email}</span>
                       </div>
                     )}
                     {account.phone && (
                       <div className="flex items-center gap-2 text-sm">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
-                        <a href={`tel:${account.phone}`} className="hover:underline">
+                        <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <a href={`tel:${account.phone}`} className="hover:underline truncate">
                           {account.phone}
+                        </a>
+                      </div>
+                    )}
+                    {account.website && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <a 
+                          href={account.website.startsWith('http') ? account.website : `https://${account.website}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline flex items-center gap-1 truncate"
+                        >
+                          <span className="truncate">{account.website}</span>
+                          <ExternalLink className="h-3 w-3 flex-shrink-0" />
                         </a>
                       </div>
                     )}
                     {account.industry && (
                       <div className="flex items-center gap-2 text-sm">
-                        <Factory className="h-4 w-4 text-muted-foreground" />
+                        <Factory className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                         <span>{account.industry}</span>
-                      </div>
-                    )}
-                    {(account.region || account.country) && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <span>{[account.region, account.country].filter(Boolean).join(', ')}</span>
                       </div>
                     )}
                     {account.company_type && (
                       <div className="flex items-center gap-2 text-sm">
-                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                        <Building2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                         <span>{account.company_type}</span>
                       </div>
                     )}
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Account Score</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <AccountScoreBadge score={account.score || 0} showProgress />
-                    <div className="mt-4 text-sm text-muted-foreground">
-                      <p>Score is calculated based on:</p>
-                      <ul className="list-disc list-inside mt-1 space-y-0.5">
-                        <li>Number of contacts</li>
-                        <li>Activity frequency</li>
-                        <li>Recent engagement</li>
-                        <li>Profile completeness</li>
-                      </ul>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+                    {(account.region || account.country) && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <span>{[account.region, account.country].filter(Boolean).join(', ')}</span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
 
               {/* Notes */}
               {account.notes && (
@@ -234,16 +199,18 @@ export const AccountDetailModal = ({ open, onOpenChange, account, onUpdate, onEd
               </div>
             </TabsContent>
 
+            <TabsContent value="tasks" className="mt-4">
+              <RelatedTasksSection 
+                moduleType="accounts"
+                recordId={account.id}
+                recordName={account.company_name}
+              />
+            </TabsContent>
+
             <TabsContent value="timeline" className="mt-4">
               <AccountActivityTimeline key={refreshKey} accountId={account.id} />
             </TabsContent>
 
-            <TabsContent value="emails" className="mt-4">
-              <div className="space-y-4">
-                <h3 className="font-medium">Email History</h3>
-                <EntityEmailHistory entityType="account" entityId={account.id} />
-              </div>
-            </TabsContent>
 
             <TabsContent value="associations" className="mt-4">
               <AccountAssociations 
@@ -262,15 +229,6 @@ export const AccountDetailModal = ({ open, onOpenChange, account, onUpdate, onEd
         onSuccess={handleActivityLogged}
       />
 
-      <SendEmailModal
-        open={showEmailModal}
-        onOpenChange={setShowEmailModal}
-        recipient={account.email ? {
-          name: account.company_name,
-          email: account.email,
-          company_name: account.company_name
-        } : null}
-      />
     </>
   );
 };

@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Search, Video, Trash2, Edit, Calendar, ArrowUpDown, ArrowUp, ArrowDown, List, CalendarDays, CheckCircle2, AlertCircle, UserX, CalendarClock, User, Columns, Upload, Download, X, Eye } from "lucide-react";
+import { Plus, Search, Video, Trash2, Edit, Calendar, ArrowUpDown, ArrowUp, ArrowDown, List, CalendarDays, CheckCircle2, AlertCircle, UserX, CalendarClock, User, Columns, Upload, Download, X, Eye, CheckSquare } from "lucide-react";
 import { RowActionsDropdown } from "@/components/RowActionsDropdown";
 import { HighlightedText } from "@/components/shared/HighlightedText";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -24,6 +24,9 @@ import { TablePagination } from "@/components/shared/TablePagination";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { getMeetingStatus } from "@/utils/meetingStatus";
+import { MeetingDetailModal } from "@/components/meetings/MeetingDetailModal";
+import { TaskModal } from "@/components/tasks/TaskModal";
+import { useTasks } from "@/hooks/useTasks";
 
 type SortColumn = 'subject' | 'date' | 'time' | 'lead_contact' | 'status' | null;
 type SortDirection = 'asc' | 'desc';
@@ -38,6 +41,8 @@ interface Meeting {
   attendees?: unknown;
   lead_id?: string | null;
   contact_id?: string | null;
+  account_id?: string | null;
+  deal_id?: string | null;
   created_by?: string | null;
   created_at?: string | null;
   status: string;
@@ -65,7 +70,7 @@ const Meetings = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
-  const [viewingMeetingId, setViewingMeetingId] = useState<string | null>(null);
+  const [viewingMeeting, setViewingMeeting] = useState<Meeting | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [meetingToDelete, setMeetingToDelete] = useState<string | null>(null);
   const [selectedMeetings, setSelectedMeetings] = useState<string[]>([]);
@@ -82,6 +87,15 @@ const Meetings = () => {
   // Column customizer state
   const [showColumnCustomizer, setShowColumnCustomizer] = useState(false);
   const [columns, setColumns] = useState<MeetingColumnConfig[]>(defaultMeetingColumns);
+  const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [taskMeetingId, setTaskMeetingId] = useState<string | null>(null);
+
+  const { createTask } = useTasks();
+
+  const handleCreateTask = (meeting: Meeting) => {
+    setTaskMeetingId(meeting.id);
+    setTaskModalOpen(true);
+  };
 
   // Get owner parameter from URL - "me" means filter by current user
   const ownerParam = searchParams.get('owner');
@@ -514,11 +528,20 @@ const Meetings = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 min-h-0 overflow-auto px-4 pt-2 pb-4">
-        {viewMode === 'calendar' ? <MeetingsCalendarView meetings={filteredMeetings} onMeetingClick={meeting => {
-        setEditingMeeting(meeting);
-        setShowModal(true);
-      }} onMeetingUpdated={fetchMeetings} /> : <div className="space-y-3">
+      <div className="flex-1 min-h-0 overflow-hidden px-4 pt-2 pb-4 flex flex-col">
+        {viewMode === 'calendar' ? (
+          <div className="flex-1 min-h-0 overflow-auto">
+            <MeetingsCalendarView
+              meetings={filteredMeetings}
+              onMeetingClick={(meeting) => {
+                setEditingMeeting(meeting);
+                setShowModal(true);
+              }}
+              onMeetingUpdated={fetchMeetings}
+            />
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3 flex-1 min-h-0">
             {/* Search and Bulk Actions */}
             <div className="flex items-center gap-4 flex-wrap">
               <div className="relative w-64">
@@ -575,7 +598,7 @@ const Meetings = () => {
 
             {/* Table */}
             <Card className="flex-1 min-h-0 flex flex-col">
-              <div className="relative overflow-auto flex-1">
+              <div className="relative overflow-auto flex-1 min-h-0">
               <Table>
                 <TableHeader>
                   <TableRow className="sticky top-0 z-20 bg-muted border-b-2">
@@ -714,8 +737,7 @@ const Meetings = () => {
                                   label: "View",
                                   icon: <Eye className="w-4 h-4" />,
                                   onClick: () => {
-                                    setEditingMeeting(meeting);
-                                    setShowModal(true);
+                                    setViewingMeeting(meeting);
                                   }
                                 },
                                 {
@@ -725,6 +747,11 @@ const Meetings = () => {
                                     setEditingMeeting(meeting);
                                     setShowModal(true);
                                   }
+                                },
+                                {
+                                  label: "Create Task",
+                                  icon: <CheckSquare className="w-4 h-4" />,
+                                  onClick: () => handleCreateTask(meeting)
                                 },
                                 {
                                   label: "Delete",
@@ -746,28 +773,27 @@ const Meetings = () => {
               </div>
               
               {/* Pagination */}
-              {totalPages > 0 && (
-                <div className="flex items-center justify-between p-4 border-t">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">
-                      Showing {filteredMeetings.length === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredMeetings.length)} of {filteredMeetings.length} meetings
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1}>
-                      Previous
-                    </Button>
-                    <span className="text-sm">
-                      Page {currentPage} of {totalPages || 1}
-                    </span>
-                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages}>
-                      Next
-                    </Button>
-                  </div>
+              <div className="flex items-center justify-between p-4 border-t">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">
+                    Showing {filteredMeetings.length === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredMeetings.length)} of {filteredMeetings.length} meetings
+                  </span>
                 </div>
-              )}
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1 || totalPages === 0}>
+                    Previous
+                  </Button>
+                  <span className="text-sm">
+                    Page {currentPage} of {totalPages || 1}
+                  </span>
+                  <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages || totalPages === 0}>
+                    Next
+                  </Button>
+                </div>
+              </div>
             </Card>
-          </div>}
+          </div>
+        )}
       </div>
 
       {/* Modals */}
@@ -775,6 +801,18 @@ const Meetings = () => {
       fetchMeetings();
       setEditingMeeting(null);
     }} />
+
+      <MeetingDetailModal 
+        open={!!viewingMeeting} 
+        onOpenChange={(open) => !open && setViewingMeeting(null)} 
+        meeting={viewingMeeting}
+        onEdit={(meeting) => {
+          setViewingMeeting(null);
+          setEditingMeeting(meeting);
+          setShowModal(true);
+        }}
+        onUpdate={fetchMeetings}
+      />
 
       <MeetingColumnCustomizer
         open={showColumnCustomizer}
@@ -825,6 +863,14 @@ const Meetings = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Task Modal */}
+      <TaskModal
+        open={taskModalOpen}
+        onOpenChange={setTaskModalOpen}
+        onSubmit={createTask}
+        context={taskMeetingId ? { module: 'meetings', recordId: taskMeetingId, locked: true } : undefined}
+      />
     </div>;
 };
 export default Meetings;

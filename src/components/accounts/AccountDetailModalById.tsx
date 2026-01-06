@@ -16,8 +16,6 @@ interface Account {
   status?: string | null;
   notes?: string | null;
   company_type?: string | null;
-  score?: number | null;
-  segment?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 }

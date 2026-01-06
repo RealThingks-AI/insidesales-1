@@ -13,23 +13,27 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, X, Eye, User, CalendarPlus } from "lucide-react";
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, X, Eye, User, CalendarPlus, Pencil, CheckSquare } from "lucide-react";
 import { RowActionsDropdown, Edit, Trash2, Mail, UserPlus } from "./RowActionsDropdown";
+import { ContactDeleteConfirmDialog } from "./ContactDeleteConfirmDialog";
+import { ContactSegmentFilter } from "./ContactSegmentFilter";
 import { ContactModal } from "./ContactModal";
 import { ContactColumnCustomizer, ContactColumnConfig, defaultContactColumns } from "./ContactColumnCustomizer";
 import { ContactDetailModal } from "./contacts/ContactDetailModal";
 import { AccountDetailModalById } from "./accounts/AccountDetailModalById";
 import { SendEmailModal } from "./SendEmailModal";
 import { MeetingModal } from "./MeetingModal";
+import { TaskModal } from "./tasks/TaskModal";
 import { HighlightedText } from "./shared/HighlightedText";
 import { ClearFiltersButton } from "./shared/ClearFiltersButton";
 import { TableSkeleton } from "./shared/Skeletons";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { useTasks } from "@/hooks/useTasks";
 import { useQuery } from "@tanstack/react-query";
 
 // Export ref interface for parent component
 export interface ContactTableRef {
   handleBulkDelete: () => Promise<void>;
+  getSelectedContactsForEmail: () => Contact[];
 }
 
 interface Contact {
@@ -191,10 +195,24 @@ export const ContactTable = forwardRef<ContactTableRef, ContactTableProps>(({
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [meetingModalOpen, setMeetingModalOpen] = useState(false);
   const [meetingContact, setMeetingContact] = useState<Contact | null>(null);
+  const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [taskContactId, setTaskContactId] = useState<string | null>(null);
 
-  // Expose handleBulkDelete to parent via ref
+  const { createTask } = useTasks();
+
+  const handleCreateTask = (contact: Contact) => {
+    setTaskContactId(contact.id);
+    setTaskModalOpen(true);
+  };
+
+  // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
-    handleBulkDelete
+    handleBulkDelete,
+    getSelectedContactsForEmail: () => {
+      return contacts.filter(
+        contact => selectedContacts.includes(contact.id) && contact.email
+      );
+    }
   }), [selectedContacts, contacts]);
 
   // Fetch all profiles for owner dropdown
@@ -563,18 +581,7 @@ export const ContactTable = forwardRef<ContactTableRef, ContactTableProps>(({
             </SelectContent>
           </Select>
 
-          <Select value={segmentFilter} onValueChange={setSegmentFilter}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="All Segments" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Segments</SelectItem>
-              <SelectItem value="prospect">Prospect</SelectItem>
-              <SelectItem value="customer">Customer</SelectItem>
-              <SelectItem value="partner">Partner</SelectItem>
-              <SelectItem value="vendor">Vendor</SelectItem>
-            </SelectContent>
-          </Select>
+          <ContactSegmentFilter value={segmentFilter} onValueChange={setSegmentFilter} />
 
           {tagFilter && (
             <Badge variant="secondary" className="flex items-center gap-1">
@@ -606,7 +613,7 @@ export const ContactTable = forwardRef<ContactTableRef, ContactTableProps>(({
 
       {/* Table */}
       <Card className="flex-1 min-h-0 flex flex-col">
-        <div className="relative overflow-auto flex-1">
+        <div className="relative overflow-auto flex-1 min-h-0">
           <Table>
             <TableHeader>
               <TableRow className="sticky top-0 z-20 bg-muted border-b-2">
@@ -621,10 +628,10 @@ export const ContactTable = forwardRef<ContactTableRef, ContactTableProps>(({
                 {visibleColumns.map(column => (
                   <TableHead
                     key={column.field}
-                    className="text-left font-bold text-foreground px-4 py-3 whitespace-nowrap"
+                    className={`font-bold text-foreground px-4 py-3 whitespace-nowrap ${column.field === 'contact_name' ? 'text-left' : 'text-center'}`}
                   >
                     <div
-                      className="group flex items-center gap-2 cursor-pointer hover:text-primary"
+                      className={`group flex items-center gap-2 cursor-pointer hover:text-primary ${column.field === 'contact_name' ? 'justify-start' : 'justify-center'}`}
                       onClick={() => handleSort(column.field)}
                     >
                       {column.label}
@@ -676,7 +683,7 @@ export const ContactTable = forwardRef<ContactTableRef, ContactTableProps>(({
                     {visibleColumns.map(column => (
                       <TableCell
                         key={column.field}
-                        className="text-left px-4 py-3 align-middle whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]"
+                        className={`px-4 py-3 align-middle whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px] ${column.field === 'contact_name' ? 'text-left' : 'text-center'}`}
                       >
                         {column.field === 'contact_name' ? (
                           <button
@@ -805,37 +812,27 @@ export const ContactTable = forwardRef<ContactTableRef, ContactTableProps>(({
                       </TableCell>
                     ))}
                     <TableCell className="w-20 px-4 py-3">
-                      <div className="flex items-center justify-center gap-1">
-                        {/* Quick view button on hover */}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => handleViewContact(contact)}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
+                      <div className="flex items-center justify-center">
                         <RowActionsDropdown
                           actions={[
                             {
-                              label: "View Details",
+                              label: "View",
                               icon: <Eye className="w-4 h-4" />,
                               onClick: () => handleViewContact(contact)
                             },
                             {
                               label: "Edit",
-                              icon: <Edit className="w-4 h-4" />,
+                              icon: <Pencil className="w-4 h-4" />,
                               onClick: () => handleEditContact(contact)
                             },
-                            {
+                            ...(contact.email ? [{
                               label: "Send Email",
                               icon: <Mail className="w-4 h-4" />,
                               onClick: () => {
                                 setEmailContact(contact);
                                 setEmailModalOpen(true);
-                              },
-                              disabled: !contact.email
-                            },
+                              }
+                            }] : []),
                             {
                               label: "Create Meeting",
                               icon: <CalendarPlus className="w-4 h-4" />,
@@ -845,10 +842,15 @@ export const ContactTable = forwardRef<ContactTableRef, ContactTableProps>(({
                               }
                             },
                             {
+                              label: "Create Task",
+                              icon: <CheckSquare className="w-4 h-4" />,
+                              onClick: () => handleCreateTask(contact),
+                              separator: true
+                            },
+                            {
                               label: "Convert to Lead",
                               icon: <UserPlus className="w-4 h-4" />,
-                              onClick: () => handleConvertToLead(contact),
-                              separator: true
+                              onClick: () => handleConvertToLead(contact)
                             },
                             {
                               label: "Delete",
@@ -870,11 +872,9 @@ export const ContactTable = forwardRef<ContactTableRef, ContactTableProps>(({
             </TableBody>
           </Table>
         </div>
-      </Card>
-
-      {/* Pagination */}
-      {totalPages > 0 && (
-        <div className="flex items-center justify-between">
+        
+        {/* Pagination */}
+        <div className="flex items-center justify-between p-4 border-t flex-shrink-0">
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">
               Showing {filteredContacts.length === 0 ? 0 : startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredContacts.length)} of {filteredContacts.length} contacts
@@ -885,7 +885,7 @@ export const ContactTable = forwardRef<ContactTableRef, ContactTableProps>(({
               variant="outline"
               size="sm"
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
+              disabled={currentPage === 1 || totalPages === 0}
             >
               <ChevronLeft className="w-4 h-4" />
               Previous
@@ -904,7 +904,7 @@ export const ContactTable = forwardRef<ContactTableRef, ContactTableProps>(({
             </Button>
           </div>
         </div>
-      )}
+      </Card>
 
       {/* Modals */}
       <ContactModal
@@ -941,29 +941,20 @@ export const ContactTable = forwardRef<ContactTableRef, ContactTableProps>(({
         isSaving={isSaving}
       />
 
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the contact.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (contactToDelete) {
-                  handleDelete(contactToDelete);
-                  setContactToDelete(null);
-                }
-              }}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ContactDeleteConfirmDialog
+        open={showDeleteDialog}
+        onConfirm={() => {
+          if (contactToDelete) {
+            handleDelete(contactToDelete);
+            setContactToDelete(null);
+          }
+          setShowDeleteDialog(false);
+        }}
+        onCancel={() => {
+          setShowDeleteDialog(false);
+          setContactToDelete(null);
+        }}
+      />
 
       {/* Account View Modal */}
       <AccountDetailModalById open={accountViewOpen} onOpenChange={setAccountViewOpen} accountId={viewAccountId} />
@@ -999,6 +990,14 @@ export const ContactTable = forwardRef<ContactTableRef, ContactTableProps>(({
           setMeetingContact(null);
           fetchContacts();
         }}
+      />
+
+      {/* Task Modal */}
+      <TaskModal
+        open={taskModalOpen}
+        onOpenChange={setTaskModalOpen}
+        onSubmit={createTask}
+        context={taskContactId ? { module: 'contacts', recordId: taskContactId, locked: true } : undefined}
       />
     </div>
   );
