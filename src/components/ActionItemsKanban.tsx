@@ -237,18 +237,11 @@ export function ActionItemsKanban({
 
                                     {/* Title */}
                                     <h4 className={cn(
-                                      'text-sm font-medium leading-snug line-clamp-2',
+                                      'text-sm font-medium leading-snug',
                                       isCompleted && 'line-through text-muted-foreground'
                                     )}>
                                       {item.title}
                                     </h4>
-
-                                    {/* Description */}
-                                    {item.description && (
-                                      <p className="text-xs text-muted-foreground line-clamp-2">
-                                        {item.description}
-                                      </p>
-                                    )}
 
                                     {/* Linked Record Chip */}
                                     {item.module_id && linkedRecordName && ModuleIcon && (
