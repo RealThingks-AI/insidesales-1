@@ -2,7 +2,9 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+// NOTE: We intentionally avoid the Radix Avatar primitive here because the preview
+// occasionally fails to load its chunk (504/ERR_ABORTED), which breaks Kanban rendering.
+// A lightweight initials avatar is sufficient for this UI.
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { Pencil, Trash2, Briefcase, UserCircle, Building2, Clock, AlertCircle } from 'lucide-react';
 import { format, differenceInDays, startOfDay } from 'date-fns';
@@ -91,6 +93,14 @@ const getInitials = (name: string): string => {
   if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 };
+
+function InitialsAvatar({ name }: { name: string }) {
+  return (
+    <div className="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-medium select-none">
+      {getInitials(name)}
+    </div>
+  );
+}
 
 const getDueDateStyles = (dueDate: string): { text: string; className: string } => {
   const date = startOfDay(new Date(dueDate));
@@ -276,11 +286,9 @@ export function ActionItemsKanban({
                                       
                                       <Tooltip>
                                         <TooltipTrigger asChild>
-                                          <Avatar className="h-6 w-6 cursor-default">
-                                            <AvatarFallback className="text-[10px] bg-primary/10 text-primary font-medium">
-                                              {getInitials(displayName)}
-                                            </AvatarFallback>
-                                          </Avatar>
+                                          <div className="cursor-default">
+                                            <InitialsAvatar name={displayName} />
+                                          </div>
                                         </TooltipTrigger>
                                         <TooltipContent>{displayName}</TooltipContent>
                                       </Tooltip>
