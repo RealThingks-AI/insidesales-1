@@ -1,104 +1,189 @@
 
 
-# Kanban Card Layout Optimization
+# Enhanced Action Items Kanban Card Design
 
-## Current Issues Identified
+## Overview
 
-Based on the selected elements and current code:
-
-| Issue | Location | Current | Problem |
-|-------|----------|---------|---------|
-| Bold title | Line 172 | `font-medium` | Too heavy for card content |
-| Pill/Badge format for Module | Line 185 | `Badge variant="secondary"` | Takes too much visual space, looks cluttered |
-| Excessive padding | Line 168 | `p-3 space-y-2` with nested `pl-4` | Too much indentation |
-| Priority dot creates unnecessary offset | Line 170-171 | Priority dot forces all content to have `pl-4` | Inconsistent alignment |
+The current Kanban cards are functional but basic. This plan enhances them to be more visually polished, information-dense, and interactive - matching enterprise CRM standards like Salesforce, HubSpot, and Monday.com.
 
 ---
 
-## Proposed Changes
+## Current Issues
 
-### 1. Remove Bold from Title
-Change `font-medium` to `font-normal` for a cleaner, lighter look.
-
-### 2. Replace Badge with Plain Text for Module
-Instead of using `<Badge>` component, display as simple text like:
-```
-Deal: BMW Infotainment - Accenture
-```
-Using a subtle text style that matches the due date and assignee format.
-
-### 3. Optimize Card Layout Structure
-- Remove priority dot from title row (already have colored left border for high priority)
-- Remove nested `pl-4` padding - use consistent spacing
-- Reduce vertical spacing from `space-y-2` to `space-y-1.5`
-- Align all content elements consistently
-
-### 4. Visual Hierarchy Improvement
-- Title: `text-sm font-normal` (not bold)
-- Module/Due Date/Assignee: `text-xs text-muted-foreground` (consistent secondary info style)
-- Remove Badge wrapper from module - display as plain text
+1. **Visual Hierarchy**: Title lacks emphasis; all text looks similar
+2. **Priority Indicator**: Only shows colored left border for High priority - other priorities invisible
+3. **Assignee Display**: Text-only, no avatar
+4. **Module Link**: Plain text, not clickable or visually distinct
+5. **Missing Features**: No quick status indicator, no progress feel, no hover card preview
+6. **Actions**: Edit/Delete buttons appear on hover but are small and hard to target
+7. **Card Density**: Good spacing but could be more compact for better overview
 
 ---
 
-## Before vs After Layout
+## Enhanced Card Design
 
-**Before:**
-```
-[●] Try to schedule a management meeting...  (bold title with dot)
-    
-    [Deal: BMW Infotainment]  (pill badge)
-    
-    📅 04-02-26
-    
-    👤 Peter Jakobsson                    [✏️][🗑️]
-```
+### 1. Card Header Section
+- **Priority Badge**: Always visible badge showing Low/Medium/High with color coding
+- **Module Type Icon**: Small icon (Briefcase for Deal, User for Lead, Building for Contact) before linked record name
+- **Title**: Bolder typography, slightly larger, always visible all text with ellipsis
 
-**After:**
-```
-Try to schedule a management meeting...  (normal weight title)
+### 2. Card Body Section
+- **Description**: Light gray, max 2 lines (already implemented)
+- **Linked Record**: Clickable link with module icon, styled as a subtle chip/tag
+- **Due Date**: Show relative time for overdue/upcoming (e.g., "Overdue by 2 days", "Due tomorrow")
 
-Deal: BMW Infotainment - Accenture  (plain text, subtle color)
-📅 04-02-26 · 👤 Peter Jakobsson                [✏️][🗑️]
-```
+### 3. Card Footer Section
+- **Assignee Avatar**: Small circular avatar with initials fallback, tooltip for full name
+- **Due Date Badge**: Color-coded (red if overdue, yellow if due soon, gray otherwise)
+- **Quick Actions**: Slightly larger touch targets, always visible on mobile
 
----
-
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/components/ActionItemsKanban.tsx` | Simplify card layout, remove Badge for module, remove title bold, consolidate footer info |
+### 4. Visual Enhancements
+- **Priority Left Border**: All priorities get colored borders (blue/yellow/red)
+- **Overdue State**: Subtle red tint on overdue cards
+- **Completed State**: Strikethrough title, muted colors
+- **Hover Effects**: Subtle lift with shadow, reveal quick-complete checkbox
 
 ---
 
 ## Technical Implementation
 
-```typescript
-// Title: Remove font-medium, keep priority dot but smaller
-<span className="text-sm line-clamp-3">{item.title}</span>
+### File Changes
 
-// Module: Plain text instead of Badge
-{item.module_id && linkedRecordName && (
-  <div className="text-xs text-muted-foreground">
-    {moduleLabels[item.module_type]}: {linkedRecordName}
-  </div>
-)}
+**1. `src/components/ActionItemsKanban.tsx`**
 
-// Consolidate footer: Due date and Assignee on same row
-<div className="flex items-center justify-between text-xs text-muted-foreground">
-  <div className="flex items-center gap-3">
-    {item.due_date && (
-      <div className="flex items-center gap-1">
-        <CalendarIcon className="h-3 w-3" />
-        <span>{formatDueDate(item.due_date)}</span>
-      </div>
-    )}
-    <div className="flex items-center gap-1">
-      <User className="h-3 w-3" />
-      <span>{getUserDisplayName(item.assigned_to) || 'Unassigned'}</span>
-    </div>
-  </div>
-  {/* Hover actions */}
-</div>
+Updates:
+- Import `Avatar`, `AvatarFallback` from `@/components/ui/avatar`
+- Import `Tooltip`, `TooltipContent`, `TooltipTrigger` from `@/components/ui/tooltip`
+- Import additional icons: `Briefcase`, `UserCircle`, `Building2`, `Clock`, `AlertCircle`
+- Add `isPast`, `isToday`, `isTomorrow`, `differenceInDays` from `date-fns`
+- Create helper functions:
+  - `getRelativeDueDate()` - returns "Overdue", "Today", "Tomorrow", or formatted date
+  - `getDueDateColor()` - returns red/yellow/gray based on due status
+  - `getModuleIcon()` - returns appropriate icon component
+  - `getInitials()` - extracts initials from display name
+
+Card Structure Changes:
 ```
+Card (with priority left border for ALL priorities)
+├── CardContent
+│   ├── Header Row (flex between)
+│   │   ├── Priority Badge (always visible)
+│   │   └── Quick Actions (edit/delete)
+│   ├── Title (font-medium, line-clamp-2)
+│   ├── Description (if exists, muted, line-clamp-2)
+│   ├── Linked Record Chip (icon + name, clickable style)
+│   └── Footer Row
+│       ├── Due Date Badge (with relative text, color-coded)
+│       └── Assignee Avatar (with tooltip)
+```
+
+### Priority Badge Styling
+```tsx
+const priorityBadgeStyles = {
+  Low: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300',
+  Medium: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300',
+  High: 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300',
+};
+```
+
+### Due Date Color Logic
+```tsx
+const getDueDateStyles = (dueDate: string) => {
+  const date = new Date(dueDate);
+  const today = new Date();
+  const diffDays = differenceInDays(date, today);
+  
+  if (diffDays < 0) return { text: 'Overdue', class: 'text-red-600 bg-red-100' };
+  if (diffDays === 0) return { text: 'Today', class: 'text-orange-600 bg-orange-100' };
+  if (diffDays === 1) return { text: 'Tomorrow', class: 'text-yellow-600 bg-yellow-100' };
+  if (diffDays <= 7) return { text: format(date, 'EEE'), class: 'text-muted-foreground' };
+  return { text: format(date, 'dd MMM'), class: 'text-muted-foreground' };
+};
+```
+
+### Assignee Avatar Component
+```tsx
+<Tooltip>
+  <TooltipTrigger asChild>
+    <Avatar className="h-6 w-6">
+      <AvatarFallback className="text-[10px] bg-primary/10">
+        {getInitials(displayName)}
+      </AvatarFallback>
+    </Avatar>
+  </TooltipTrigger>
+  <TooltipContent>{displayName}</TooltipContent>
+</Tooltip>
+```
+
+### Module Icon Mapping
+```tsx
+const moduleIcons = {
+  deals: Briefcase,
+  leads: UserCircle,
+  contacts: Building2,
+};
+```
+
+---
+
+## Visual Comparison
+
+### Before
+```
+┌─────────────────────────────────┐
+│ Work with REFU purchasing...   │  <- Title, no emphasis
+│ Deal: REFU - GnT                │  <- Plain text link
+│ 📅 06-02-26  👤 Peter Jakobsson │  <- Basic footer
+└─────────────────────────────────┘
+```
+
+### After
+```
+┌────────────────────────────────────┐
+│ [High] ●●●               ✏️ 🗑️    │  <- Priority badge + actions
+│ Work with REFU purchasing and...  │  <- Bold title
+│ engineering to understand OS...   │
+│ [🧳 REFU - GnT]                   │  <- Clickable module chip
+│ [⚠️ Overdue]            [PJ]     │  <- Color-coded + avatar
+└────────────────────────────────────┘
+```
+
+---
+
+## Additional Enhancements
+
+### Empty State Improvement
+- Add subtle illustration or icon
+- More encouraging copy: "No items in this column - drag tasks here or create new ones"
+
+### Column Count Badge
+- Keep current implementation (already good)
+
+### Drag Preview
+- Current rotation effect is good, keep it
+
+### Mobile Responsiveness
+- Actions always visible on mobile (touch devices)
+- Larger touch targets for buttons
+
+---
+
+## Summary of Changes
+
+| Component | Change |
+|-----------|--------|
+| Priority | Always-visible colored badge instead of just high-priority border |
+| Title | Bolder, better truncation |
+| Module Link | Icon + chip style, visually distinct |
+| Due Date | Relative text + color coding (overdue = red) |
+| Assignee | Avatar with initials + tooltip |
+| Actions | Always visible header placement |
+| Left Border | All priorities get colored borders |
+| Overdue Cards | Subtle visual treatment |
+
+---
+
+## Files Modified
+
+1. `src/components/ActionItemsKanban.tsx` - Complete card redesign
 
