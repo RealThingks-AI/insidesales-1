@@ -1,115 +1,139 @@
 
+## What’s happening (root cause)
+You’re still seeing the old **two inline row icons (pencil + trash)** in the Preview site for:
+- Accounts
+- Leads
+- Deals
+- Action Items
 
-# Fix: Enhanced Action Items Kanban Cards
+From code inspection, the reason is **not a single global setting**—it’s that **at least one active table implementation still renders the old inline buttons**, and we need to make sure *every route’s actual list table component* uses the same “MoreHorizontal → dropdown menu” pattern.
 
-## Problem
+One confirmed offender in the current codebase is:
+- **Deals (List view)**: `src/components/ListView.tsx` still renders inline Pencil + Trash buttons in the row actions cell.
 
-The code changes for enhanced Kanban cards appear in the file but aren't rendering in the preview. The cards are still showing the old basic design with:
-- Plain text dates (dd-MM-yy)
-- Text-based assignee display ("Assignee: Name")
-- Plain "Deal: RecordName" text
-- No priority badges
-- No avatars
+For the other modules (Accounts/Leads/Action Items), the expected dropdown code exists in some files, but since you still see old icons in Preview, we will **re-audit and update the exact components that are actually rendering those rows**, and remove any remaining inline action button groups.
 
-## Solution
+---
 
-Re-implement the enhanced card design with the following improvements per your requirements:
+## Goal (final UI behavior)
+In each module’s table rows:
+- The right-most actions column shows **one MoreHorizontal (… ) button** (revealed on hover, same as current behavior)
+- Clicking it opens a dropdown with module-specific actions
+- No inline pencil/trash icons remain in the row
 
-### Card Enhancements
+---
 
-| Element | Before | After |
-|---------|--------|-------|
-| Title | line-clamp-2 | Full text visible (no truncation) |
-| Description | Shows 2 lines | Hidden completely |
-| Priority | Only left border | Always-visible colored badge + left border |
-| Due Date | Plain date format | Relative text (Overdue X days, Today, Tomorrow) + color coding |
-| Assignee | "Assignee: Name" text | Avatar with initials + tooltip |
-| Module Link | "Deal: Name" text | Icon chip with module type icon |
+## Implementation approach
+### Phase 1 — Identify the exact rendering components (per module)
+For each affected route, we will verify the component chain and then edit the exact file that renders the row actions cell:
 
-### Visual Design
+1) **Accounts** (`/accounts`)
+- Confirm: `src/pages/Accounts.tsx` → `src/components/AccountTable.tsx` → `src/components/account-table/AccountTableBody.tsx`
+- Re-check the row action cell implementation in `AccountTableBody.tsx`.
+- If the Preview still shows inline icons, it means a different table implementation is being used somewhere; we’ll locate it by searching for inline Pencil/Trash patterns tied to accounts rows and update that file.
 
-```
-+--------------------------------------------+
-| [High]                          [Edit][Del]| <- Priority badge + actions
-+--------------------------------------------+
-| Work with REFU purchasing and engineering  | <- Full title (no truncation)
-| to understand OS levels and roadmap...     |
-+--------------------------------------------+
-| [Briefcase Icon] REFU - GnT                | <- Module chip
-+--------------------------------------------+
-| [Warning] Overdue 3 days           [Peter J]    | <- Color-coded due + User display name
-+--------------------------------------------+
-```
+2) **Leads** (`/leads`)
+- Confirm: `src/pages/Leads.tsx` → `src/components/LeadTable.tsx`
+- Re-check/update the row action cell in `LeadTable.tsx` (and ensure no alternate leads table is being used anywhere in that route).
 
-### Technical Changes
+3) **Action Items** (`/action-items`)
+- Confirm: `src/pages/ActionItems.tsx` → `src/components/ActionItemsTable.tsx`
+- Re-check/update the row action cell in `ActionItemsTable.tsx` and remove any remaining inline action buttons if present in the actual rendered component.
 
-**File: `src/components/ActionItemsKanban.tsx`**
+4) **Deals** (`/deals` list view)
+- Confirm: `src/pages/DealsPage.tsx` → `src/components/ListView.tsx`
+- This file currently uses the old inline buttons; we will replace them with the dropdown menu.
 
-1. **Remove description display** - Delete the description section entirely
-2. **Remove line-clamp from title** - Show full title text
-3. **Ensure priority badge is visible** - Already in code but verify rendering
-4. **Ensure avatar is visible** - Already in code but verify rendering
-5. **Ensure module chip is visible** - Already in code but verify rendering
-6. **Ensure due date styling is applied** - Already in code but verify rendering
+Deliverable of this phase: a short checklist confirming “this is the file that renders the row actions for each module”.
 
-### Key Code Sections
+---
 
-**Title (no truncation):**
-```tsx
-<h4 className={cn(
-  'text-sm font-medium leading-snug',
-  isCompleted && 'line-through text-muted-foreground'
-)}>
-  {item.title}
-</h4>
-```
+### Phase 2 — Apply the unified Row Actions Dropdown everywhere
+We will standardize the action cell markup across all affected tables to this structure:
 
-**Priority Badge (always visible):**
-```tsx
-<Badge 
-  variant="secondary" 
-  className={cn('text-[10px] px-1.5 py-0.5 font-medium', priority.badgeClass)}
->
-  {priority.label}
-</Badge>
-```
+- Container:
+  - `opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex justify-center`
+- Trigger:
+  - Ghost icon button with `MoreHorizontal`
+- Menu:
+  - `DropdownMenuContent align="end"` using existing `src/components/ui/dropdown-menu.tsx` (already has solid background and `z-50`)
 
-**Module Chip:**
-```tsx
-{item.module_id && linkedRecordName && ModuleIcon && (
-  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted text-xs text-muted-foreground">
-    <ModuleIcon className="h-3 w-3" />
-    <span className="truncate max-w-[140px]">{linkedRecordName}</span>
-  </span>
-)}
-```
+#### A) Deals — fix `src/components/ListView.tsx` (required)
+Replace the inline pencil/trash buttons in the row action cell with a dropdown menu:
 
-**Assignee Avatar:**
-```tsx
-<Tooltip>
-  <TooltipTrigger asChild>
-    <Avatar className="h-6 w-6 cursor-default">
-      <AvatarFallback className="text-[10px] bg-primary/10 text-primary font-medium">
-        {getInitials(displayName)}
-      </AvatarFallback>
-    </Avatar>
-  </TooltipTrigger>
-  <TooltipContent>{displayName}</TooltipContent>
-</Tooltip>
-```
+Menu items:
+- Edit (calls existing `onDealClick(deal)`)
+- Action Items (calls existing `handleActionClick(deal)` to open `DealActionItemsModal`)
+- Delete (sets `setDealToDelete(deal.id)` and opens existing delete dialog)
 
-**Due Date with Relative Text:**
-```tsx
-<span className={cn(
-  'inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded font-medium',
-  getDueDateStyles(item.due_date).className
-)}>
-  {itemIsOverdue && <AlertCircle className="h-3 w-3" />}
-  {getDueDateStyles(item.due_date).text}
-</span>
-```
+Also:
+- Add needed imports (`MoreHorizontal`, `ListTodo`, `DropdownMenuSeparator`, and dropdown components).
+- Ensure click events don’t trigger row selection/click unintentionally by stopping propagation on the actions cell (same as other tables).
 
-### Files Modified
+#### B) Accounts — ensure action menu includes “View Linked Contacts”
+In the active accounts table row action cell:
+- Edit
+- View Linked Contacts (opens the linked contacts dialog)
+- Delete (destructive)
 
-1. `src/components/ActionItemsKanban.tsx` - Complete re-write of the card content section to ensure all enhancements are applied correctly
+If the route is still rendering inline icons, we will:
+- Find the exact component rendering the accounts rows (search for the inline actions pattern within accounts-related components)
+- Replace it with the dropdown pattern
 
+#### C) Leads — ensure menu includes Convert + Action Items
+In the active leads table row action cell:
+- Edit
+- Convert to Deal (opens existing `ConvertToDealModal`)
+- Action Items (opens existing `LeadActionItemsModal`)
+- Delete (destructive)
+
+Same fallback approach: if inline icons are still rendered, locate the actual component and replace the action cell.
+
+#### D) Action Items — ensure menu includes Mark Complete
+In the active action items list table row action cell:
+- Edit
+- Mark Complete (only if status != Completed)
+- Delete (destructive)
+
+---
+
+### Phase 3 — Verification checklist (end-to-end)
+After applying changes, we will verify in Preview:
+
+1) **Accounts**
+- Hover a row → only (… ) appears in the actions column
+- Dropdown shows: Edit, View Linked Contacts, Delete
+- View Linked Contacts opens dialog correctly
+
+2) **Leads**
+- Hover a row → only (… ) appears
+- Dropdown shows: Edit, Convert to Deal, Action Items, Delete
+- Convert to Deal opens modal
+- Action Items opens modal
+
+3) **Deals (List view)**
+- Hover a row → only (… ) appears
+- Dropdown shows: Edit, Action Items, Delete
+- Action Items opens the DealActionItemsModal
+- Delete opens confirmation dialog
+
+4) **Action Items (List view)**
+- Hover a row → only (… ) appears
+- Dropdown shows: Edit, Mark Complete (when applicable), Delete
+- Mark Complete updates status
+
+---
+
+## Files expected to change
+- `src/components/ListView.tsx` (definite change; currently still old inline actions)
+- Potentially (depending on where the old inline actions are actually coming from in Preview):
+  - `src/components/account-table/AccountTableBody.tsx`
+  - `src/components/LeadTable.tsx`
+  - `src/components/ActionItemsTable.tsx`
+  - Any alternate table component discovered during Phase 1 audit that still renders inline action buttons for these routes
+
+---
+
+## Notes on keeping the UI consistent
+- We will keep the existing hover-reveal interaction standard (`opacity-0 group-hover:opacity-100`).
+- The dropdown background and z-index are already handled well by `src/components/ui/dropdown-menu.tsx` (uses `bg-popover` + `z-50`), so we’ll reuse it everywhere.
