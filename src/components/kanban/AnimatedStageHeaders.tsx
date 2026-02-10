@@ -45,12 +45,12 @@ export function AnimatedStageHeaders({
       const beforeCount = expandedIndex;
       const afterCount = visibleStages.length - expandedIndex - 1;
       
-      // Grid: [before stages] [expanded stage 280px] [details ~60%] [after stages]
+      // Match KanbanBoard grid: ~15% stage / ~70% details / ~15% others
       const parts: string[] = [];
-      if (beforeCount > 0) parts.push(`repeat(${beforeCount}, minmax(240px, 1fr))`);
-      parts.push('minmax(280px, 280px)'); // expanded stage fixed width
-      parts.push('minmax(800px, 3fr)'); // details panel - wider for side-by-side History/Action Items
-      if (afterCount > 0) parts.push(`repeat(${afterCount}, minmax(240px, 1fr))`);
+      if (beforeCount > 0) parts.push(`repeat(${beforeCount}, minmax(200px, 0.5fr))`);
+      parts.push('minmax(250px, 1fr)'); // expanded stage ~15%
+      parts.push('minmax(600px, 5fr)'); // details panel ~70%
+      if (afterCount > 0) parts.push(`repeat(${afterCount}, minmax(200px, 0.5fr))`);
       
       return {
         display: 'grid',
