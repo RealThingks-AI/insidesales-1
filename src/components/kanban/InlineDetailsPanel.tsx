@@ -9,6 +9,7 @@ interface InlineDetailsPanelProps {
   transition: TransitionState;
   onClose: () => void;
   onOpenActionItemModal?: (actionItem?: any) => void;
+  topOffset?: number;
 }
 
 export function InlineDetailsPanel({
@@ -16,6 +17,7 @@ export function InlineDetailsPanel({
   transition,
   onClose,
   onOpenActionItemModal,
+  topOffset = 0,
 }: InlineDetailsPanelProps) {
   const isEntering = transition === 'expanding';
   const isExiting = transition === 'collapsing';
@@ -23,13 +25,16 @@ export function InlineDetailsPanel({
   return (
     <div 
       className={cn(
-        'flex flex-col overflow-y-auto',
+        'flex flex-col',
         isEntering && 'inline-details-entering',
         isExiting && 'inline-details-exiting'
       )}
       style={{ 
         animationDuration: '300ms',
-        height: 'calc(100vh - 160px)',
+        marginTop: topOffset > 0 ? `${topOffset}px` : undefined,
+        maxHeight: topOffset > 0 ? `calc(100vh - ${topOffset + 120}px)` : undefined,
+        minHeight: '400px',
+        transition: 'margin-top 0.3s ease-out',
       }}
     >
       <DealExpandedPanel 
