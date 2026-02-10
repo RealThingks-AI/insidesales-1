@@ -125,18 +125,7 @@ export const KanbanBoard = ({
         left: scrollContainerRef.current.scrollLeft,
       };
       
-      // Measure card position for panel alignment
-      const cardEl = scrollContainerRef.current.querySelector(`[data-deal-id="${dealId}"]`);
-      const stickyHeader = scrollContainerRef.current.querySelector('.sticky.top-0');
-      const stickyHeaderHeight = stickyHeader?.getBoundingClientRect().height || 65;
-      
-      if (cardEl) {
-        const containerRect = scrollContainerRef.current.getBoundingClientRect();
-        const cardRect = cardEl.getBoundingClientRect();
-        // Calculate offset relative to the scrollable content area (below sticky header)
-        const relativeTop = cardRect.top - containerRect.top - stickyHeaderHeight + scrollContainerRef.current.scrollTop;
-        setCardTopOffset(Math.max(0, relativeTop));
-      }
+      // Card offset will be measured post-layout in a useEffect
     }
     setExpandedDealId(dealId);
     setExpandedStage(deal.stage as DealStage);
@@ -486,6 +475,31 @@ export const KanbanBoard = ({
       });
     });
   }, [expandedDealId, expandedStage]);
+
+  // Post-layout measurement: measure card position after grid has restructured
+  useEffect(() => {
+    if ((transition === 'expanding' || transition === 'expanded') && expandedDealId && expandedStage && scrollContainerRef.current) {
+      // Wait for grid layout to settle with triple rAF
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const container = scrollContainerRef.current;
+            if (!container) return;
+            
+            const cardEl = container.querySelector(`[data-deal-id="${expandedDealId}"]`);
+            const stageCol = container.querySelector(`[data-stage-column="${expandedStage}"]`);
+            
+            if (cardEl && stageCol) {
+              const stageRect = stageCol.getBoundingClientRect();
+              const cardRect = cardEl.getBoundingClientRect();
+              const offset = cardRect.top - stageRect.top;
+              setCardTopOffset(Math.max(0, offset));
+            }
+          });
+        });
+      });
+    }
+  }, [transition, expandedDealId, expandedStage]);
 
   // Auto-scroll when expansion starts, with post-transition correction
   useEffect(() => {
