@@ -128,6 +128,87 @@ export type Database = {
         }
         Relationships: []
       }
+      backup_schedules: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          frequency: string
+          id: string
+          is_enabled: boolean
+          last_run_at: string | null
+          next_run_at: string | null
+          time_of_day: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          frequency?: string
+          id?: string
+          is_enabled?: boolean
+          last_run_at?: string | null
+          next_run_at?: string | null
+          time_of_day?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          frequency?: string
+          id?: string
+          is_enabled?: boolean
+          last_run_at?: string | null
+          next_run_at?: string | null
+          time_of_day?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      backups: {
+        Row: {
+          backup_type: string
+          created_at: string
+          created_by: string | null
+          file_name: string
+          file_path: string
+          id: string
+          manifest: Json | null
+          module_name: string | null
+          records_count: number | null
+          size_bytes: number | null
+          status: string
+          tables_count: number | null
+        }
+        Insert: {
+          backup_type?: string
+          created_at?: string
+          created_by?: string | null
+          file_name: string
+          file_path: string
+          id?: string
+          manifest?: Json | null
+          module_name?: string | null
+          records_count?: number | null
+          size_bytes?: number | null
+          status?: string
+          tables_count?: number | null
+        }
+        Update: {
+          backup_type?: string
+          created_at?: string
+          created_by?: string | null
+          file_name?: string
+          file_path?: string
+          id?: string
+          manifest?: Json | null
+          module_name?: string | null
+          records_count?: number | null
+          size_bytes?: number | null
+          status?: string
+          tables_count?: number | null
+        }
+        Relationships: []
+      }
       column_preferences: {
         Row: {
           column_widths: Json
@@ -294,6 +375,7 @@ export type Database = {
       }
       deals: {
         Row: {
+          account_id: string | null
           action_items: string | null
           budget: string | null
           business_value: string | null
@@ -342,6 +424,7 @@ export type Database = {
           won_reason: string | null
         }
         Insert: {
+          account_id?: string | null
           action_items?: string | null
           budget?: string | null
           business_value?: string | null
@@ -390,6 +473,7 @@ export type Database = {
           won_reason?: string | null
         }
         Update: {
+          account_id?: string | null
           action_items?: string | null
           budget?: string | null
           business_value?: string | null
@@ -437,7 +521,15 @@ export type Database = {
           total_revenue?: number | null
           won_reason?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "deals_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       keep_alive: {
         Row: {
@@ -498,6 +590,7 @@ export type Database = {
       }
       leads: {
         Row: {
+          account_id: string | null
           company_name: string | null
           contact_owner: string | null
           contact_source: string | null
@@ -518,6 +611,7 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          account_id?: string | null
           company_name?: string | null
           contact_owner?: string | null
           contact_source?: string | null
@@ -538,6 +632,7 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          account_id?: string | null
           company_name?: string | null
           contact_owner?: string | null
           contact_source?: string | null
@@ -557,7 +652,15 @@ export type Database = {
           position?: string | null
           website?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "leads_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notification_preferences: {
         Row: {

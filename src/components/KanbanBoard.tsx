@@ -60,7 +60,7 @@ export const KanbanBoard = ({
   const [expandedDealId, setExpandedDealId] = useState<string | null>(null);
   const [expandedStage, setExpandedStage] = useState<DealStage | null>(null);
   const [pendingExpandId, setPendingExpandId] = useState<string | null>(null);
-  const [cardTopOffset, setCardTopOffset] = useState<number>(0);
+  const [detailsSpacerHeight, setDetailsSpacerHeight] = useState<number>(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const savedScrollPosition = useRef<{ top: number; left: number }>({ top: 0, left: 0 });
   const TRANSITION_MS = 300;
@@ -355,8 +355,6 @@ export const KanbanBoard = ({
 
   const visibleStages = getVisibleStages();
 
-  // Debug flag for scroll calculations
-  const DEBUG_SCROLL = false;
 
   // Layout-safe scroll helper: waits for 3 animation frames before measuring
   const performLayoutSafeScroll = useCallback(() => {
@@ -376,95 +374,28 @@ export const KanbanBoard = ({
 
           // Find the stage column element
           const stageEl = container.querySelector(`[data-stage-column="${expandedStage}"]`);
-          // Find the details panel element
-          const detailsEl = container.querySelector('[data-details-panel="true"]');
-          // Find the selected card element
           const cardEl = container.querySelector(`[data-deal-id="${expandedDealId}"]`);
 
-          if (!stageEl) {
-            if (DEBUG_SCROLL) console.log('[Scroll] Stage element not found');
-            return;
-          }
+          if (!stageEl) return;
 
-          const containerRect = container.getBoundingClientRect();
-          const stageRect = stageEl.getBoundingClientRect();
-          const detailsRect = detailsEl?.getBoundingClientRect();
-          const cardRect = cardEl?.getBoundingClientRect();
+          const paddingMargin = 8;
 
-          const paddingMargin = 16;
-
-          // Calculate horizontal scroll
-          // Goal: show expanded stage at left, with details panel fully visible if possible
-          let targetScrollLeft = container.scrollLeft + stageRect.left - containerRect.left - paddingMargin;
-
-          // If details panel exists, ensure it's fully visible
-          if (detailsRect) {
-            const detailsRightRelative = container.scrollLeft + detailsRect.right - containerRect.left;
-            const viewportWidth = container.clientWidth;
-            
-            // If details would be cut off on the right, shift scroll to show it
-            if (detailsRightRelative - targetScrollLeft > viewportWidth) {
-              targetScrollLeft = detailsRightRelative - viewportWidth + paddingMargin;
-            }
-          }
+          // Horizontal: scroll so the expanded stage column is at the left edge
+          let targetScrollLeft = (stageEl as HTMLElement).offsetLeft - paddingMargin;
 
           // Clamp horizontal scroll to valid range
           const maxScrollLeft = container.scrollWidth - container.clientWidth;
           targetScrollLeft = Math.max(0, Math.min(targetScrollLeft, maxScrollLeft));
 
-          // Calculate vertical scroll
-          // Goal: position so both card and details panel are visible
-          // Priority: show details panel fully, even if card needs to scroll up
+          // Vertical: scroll so the expanded card is near the top (below sticky header)
           let targetScrollTop = 0;
-          
-          if (cardRect && detailsRect) {
-            const cardTopRelative = cardRect.top - containerRect.top + container.scrollTop;
-            const detailsPanelHeight = detailsRect.height;
-            const viewportHeight = container.clientHeight;
-            const availableHeight = viewportHeight - stickyHeaderHeight - paddingMargin;
-            
-            // Calculate where the card is relative to content
-            const cardOffset = cardTopRelative - stickyHeaderHeight;
-            
-            // If details panel would extend beyond viewport, prioritize showing panel
-            if (detailsPanelHeight > availableHeight) {
-              // Panel is taller than viewport, scroll so panel top aligns with card
-              targetScrollTop = cardOffset - paddingMargin;
-            } else {
-              // Check if panel bottom would be cut off
-              const panelBottomIfCardAtTop = cardOffset + detailsPanelHeight;
-              const scrollNeededToShowPanel = panelBottomIfCardAtTop - viewportHeight + stickyHeaderHeight + paddingMargin;
-              
-              if (scrollNeededToShowPanel > cardOffset) {
-                // Need to scroll card up to show full panel
-                targetScrollTop = scrollNeededToShowPanel;
-              } else {
-                // Card position allows full panel to be visible
-                targetScrollTop = cardOffset - paddingMargin;
-              }
-            }
-            
-            // Clamp to valid range
-            const maxScrollTop = container.scrollHeight - container.clientHeight;
-            targetScrollTop = Math.max(0, Math.min(targetScrollTop, maxScrollTop));
-          } else if (cardRect) {
-            targetScrollTop = container.scrollTop + cardRect.top - containerRect.top - stickyHeaderHeight - paddingMargin;
+          if (cardEl) {
+            const cardOffsetTop = (cardEl as HTMLElement).offsetTop;
+            targetScrollTop = cardOffsetTop - stickyHeaderHeight - paddingMargin;
             const maxScrollTop = container.scrollHeight - container.clientHeight;
             targetScrollTop = Math.max(0, Math.min(targetScrollTop, maxScrollTop));
           }
 
-          if (DEBUG_SCROLL) {
-            console.log('[Scroll] Measurements:', {
-              stickyHeaderHeight,
-              stageRect: { left: stageRect.left, width: stageRect.width },
-              detailsRect: detailsRect ? { left: detailsRect.left, right: detailsRect.right, width: detailsRect.width, height: detailsRect.height } : null,
-              cardRect: cardRect ? { top: cardRect.top } : null,
-              targetScrollLeft,
-              targetScrollTop,
-              containerScrollWidth: container.scrollWidth,
-              containerClientWidth: container.clientWidth,
-            });
-          }
 
           container.scrollTo({
             left: targetScrollLeft,
@@ -476,10 +407,9 @@ export const KanbanBoard = ({
     });
   }, [expandedDealId, expandedStage]);
 
-  // Post-layout measurement: measure card position after grid has restructured
+  // Post-layout measurement: measure expanded card's vertical offset within its stage column
   useEffect(() => {
     if ((transition === 'expanding' || transition === 'expanded') && expandedDealId && expandedStage && scrollContainerRef.current) {
-      // Wait for grid layout to settle with triple rAF
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
@@ -493,7 +423,7 @@ export const KanbanBoard = ({
               const stageRect = stageCol.getBoundingClientRect();
               const cardRect = cardEl.getBoundingClientRect();
               const offset = cardRect.top - stageRect.top;
-              setCardTopOffset(Math.max(0, offset));
+              setDetailsSpacerHeight(Math.max(0, offset));
             }
           });
         });
@@ -566,11 +496,11 @@ export const KanbanBoard = ({
       const beforeCount = expandedIndex;
       const afterCount = visibleStages.length - expandedIndex - 1;
       
-      // Grid: [before stages] [expanded stage 280px] [details ~60%] [after stages]
+      // Grid: [before stages] [expanded stage 280px] [details ~50%] [after stages]
       const parts: string[] = [];
       if (beforeCount > 0) parts.push(`repeat(${beforeCount}, minmax(240px, 1fr))`);
-      parts.push('minmax(280px, 280px)'); // expanded stage fixed width
-      parts.push('minmax(800px, 3fr)'); // details panel - wider for side-by-side History/Action Items
+      parts.push('minmax(300px, 300px)'); // expanded stage fixed width
+      parts.push('minmax(750px, 3fr)'); // details panel
       if (afterCount > 0) parts.push(`repeat(${afterCount}, minmax(240px, 1fr))`);
       
       return parts.join(' ');
@@ -782,7 +712,7 @@ export const KanbanBoard = ({
                       </Droppable>
                     </div>
                     
-                    {/* Inline Details Panel - aligned with selected card */}
+                    {/* Inline Details Panel - aligned with selected card via spacer */}
                     {isExpandedStage && isInlineExpanded && expandedDealObject && (
                       <div 
                         data-details-panel="true"
@@ -792,12 +722,15 @@ export const KanbanBoard = ({
                           height: 'fit-content',
                         }}
                       >
+                        {/* Spacer to align details panel with expanded card */}
+                        {detailsSpacerHeight > 0 && (
+                          <div style={{ height: `${detailsSpacerHeight}px`, flexShrink: 0 }} />
+                        )}
                         <InlineDetailsPanel
                           deal={expandedDealObject}
                           transition={transition}
                           onClose={beginCollapse}
                           onOpenActionItemModal={handleOpenActionItemModal}
-                          topOffset={cardTopOffset}
                         />
                       </div>
                     )}

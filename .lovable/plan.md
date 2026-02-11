@@ -1,70 +1,42 @@
 
 
-# Fix: Card and Details Panel Side-by-Side Alignment
+## Audit Logs: Default Filter and Column Reorder
 
-## Problem
+### Change 1: Show All Activities Except Authentication by Default
 
-When clicking a deal card to expand its details panel, the panel does not align vertically with the selected card. The `cardTopOffset` is measured **before** the CSS grid restructures (columns change from equal to expanded+details), so by the time the new layout settles, the card has moved and the offset is stale.
+Add a new filter category `'all_except_auth'` that shows everything except login/logout entries. Set this as the default.
 
-## Solution
+**File: `src/components/settings/audit/auditLogUtils.ts`**
+- Add `'all_except_auth'` to `FilterCategory` type
+- Add filtering logic in `filterByCategory` to exclude authentication actions
 
-Replace the pre-expansion offset measurement with a **post-layout measurement** that runs after the grid has finished transitioning. Instead of calculating `cardTopOffset` in `beginExpand`, calculate it in a `useEffect` that fires after the grid has settled (during `expanding` and `expanded` states).
+**File: `src/components/settings/AuditLogsSettings.tsx`**
+- Change default `category` state from `'record_changes'` to `'all_except_auth'`
 
-### Approach
+**File: `src/components/settings/audit/AuditLogFilters.tsx`**
+- Add new dropdown option "All (except Auth)" as the first item
 
-1. **Remove offset calculation from `beginExpand`** -- stop measuring before the grid changes
-2. **Add a post-layout effect** that measures the card's position within its stage column after the grid has restructured
-3. **Calculate offset as card's position relative to the details panel column start** -- both are grid children starting at the same row, so `marginTop` on the details panel should equal the card's `offsetTop` within the stage column's droppable area
-4. **Re-measure on transition changes** to handle the expanding -> expanded transition
+### Change 2: Rearrange Column Order and Widths
 
-### Files Modified
+New column order with percentage-based widths using the requested layout:
 
-**1. `src/components/KanbanBoard.tsx`**
+| # | Column | Width |
+|---|--------|-------|
+| 1 | Activity | 10% |
+| 2 | Module | 10% |
+| 3 | Summary | 50% |
+| 4 | User | 10% |
+| 5 | Time | 10% |
+| 6 | Actions | 10% |
 
-- Remove `cardTopOffset` calculation from `beginExpand` (lines ~128-139)
-- Add new `useEffect` that runs when `transition` is `expanding` or `expanded`:
-  - Uses triple `requestAnimationFrame` to wait for layout
-  - Finds the card element via `[data-deal-id="..."]`
-  - Finds the stage column via `[data-stage-column="..."]`
-  - Calculates card's `offsetTop` relative to the stage column top
-  - Sets `cardTopOffset` to that value
-- Keep the scroll logic (`performLayoutSafeScroll`) as-is since it already handles post-layout measurement
+**File: `src/components/settings/AuditLogsSettings.tsx`**
+- Reorder `TableHead` elements to: Activity, Module, Summary, User, Time, Actions
+- Replace fixed `w-[...]` widths with percentage-based `w-[10%]` / `w-[50%]`
+- Reorder corresponding `TableCell` elements in each row to match
+- Remove the Date/Time column name, rename to just "Time"
 
-**2. `src/components/kanban/InlineDetailsPanel.tsx`**
-
-- Keep `marginTop` approach but make it sticky-aware:
-  - Use `position: sticky` with `top` set to the offset so the panel stays aligned even during scroll
-  - Or simply keep current `marginTop` approach since the post-layout measurement will be accurate
-
-### Technical Detail
-
-```tsx
-// In KanbanBoard.tsx - new effect replacing pre-expansion measurement
-useEffect(() => {
-  if ((transition === 'expanding' || transition === 'expanded') && expandedDealId && scrollContainerRef.current) {
-    // Wait for grid layout to settle
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const container = scrollContainerRef.current;
-          if (!container) return;
-          
-          const cardEl = container.querySelector(`[data-deal-id="${expandedDealId}"]`);
-          const stageCol = container.querySelector(`[data-stage-column="${expandedStage}"]`);
-          
-          if (cardEl && stageCol) {
-            const stageRect = stageCol.getBoundingClientRect();
-            const cardRect = cardEl.getBoundingClientRect();
-            // Card's vertical offset within the stage column
-            const offset = cardRect.top - stageRect.top;
-            setCardTopOffset(Math.max(0, offset));
-          }
-        });
-      });
-    });
-  }
-}, [transition, expandedDealId, expandedStage]);
-```
-
-This ensures the details panel's `marginTop` matches the card's actual position after the grid has restructured, achieving true side-by-side alignment.
+### Files to Modify
+1. `src/components/settings/audit/auditLogUtils.ts` -- new filter category type and logic
+2. `src/components/settings/AuditLogsSettings.tsx` -- default state + column reorder
+3. `src/components/settings/audit/AuditLogFilters.tsx` -- new dropdown option
 
