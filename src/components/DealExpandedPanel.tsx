@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { X, Plus, Clock, History, ListTodo, ChevronDown, ChevronRight, Eye, Pencil, ArrowRight, RefreshCw, Check, ArrowUpDown, ArrowUp, ArrowDown, MessageSquarePlus, Phone, Mail, Calendar, FileText, User, MoreHorizontal, Trash2, CheckCircle, Handshake } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { X, Plus, Clock, History, ListTodo, ChevronDown, ChevronRight, Eye, Pencil, ArrowRight, Check, ArrowUpDown, ArrowUp, ArrowDown, MessageSquarePlus, Phone, Mail, Calendar, FileText, User, MoreHorizontal, Trash2, CheckCircle, Handshake } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 // Checkbox import removed - using serial numbers instead
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -224,10 +224,10 @@ const parseChangeSummary = (action: string, details: Record<string, unknown> | n
  
    const isLoading = logsLoading || itemsLoading;
 
-   // Refresh history logs
-   const handleRefreshHistory = () => {
+   // Auto-refresh history logs when panel opens
+   useEffect(() => {
      queryClient.invalidateQueries({ queryKey: ['deal-audit-logs', deal.id] });
-   };
+   }, [deal.id, queryClient]);
    
    // Handle adding a manual log entry
    const handleAddLog = async () => {
@@ -631,17 +631,6 @@ const parseChangeSummary = (action: string, details: Record<string, unknown> | n
                   >
                     <MessageSquarePlus className="h-3 w-3" />
                     Add Log
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRefreshHistory();
-                    }}
-                  >
-                    <RefreshCw className={`h-3 w-3 text-muted-foreground ${logsLoading ? 'animate-spin' : ''}`} />
                   </Button>
                 </button>
               </CollapsibleTrigger>
