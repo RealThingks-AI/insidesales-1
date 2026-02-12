@@ -70,6 +70,9 @@ export const KanbanBoard = ({
    const [editingActionItem, setEditingActionItem] = useState<ActionItem | null>(null);
    const [actionModalDealId, setActionModalDealId] = useState<string | null>(null);
    const { createActionItem, updateActionItem } = useActionItems();
+   
+   // Add Detail modal state (triggered from AnimatedStageHeaders "Add" button)
+   const [addDetailOpen, setAddDetailOpen] = useState(false);
 
   // Handle keyboard escape to close expanded panel
   useEffect(() => {
@@ -620,6 +623,7 @@ export const KanbanBoard = ({
               selectedDeals={selectedDeals}
               onSelectAllInStage={handleSelectAllInStage}
               onCreateDeal={onCreateDeal}
+              onAddDetail={() => setAddDetailOpen(true)}
             />
           </div>
 
@@ -731,6 +735,8 @@ export const KanbanBoard = ({
                           transition={transition}
                           onClose={beginCollapse}
                           onOpenActionItemModal={handleOpenActionItemModal}
+                          addDetailOpen={addDetailOpen}
+                          onAddDetailOpenChange={setAddDetailOpen}
                         />
                       </div>
                     )}
