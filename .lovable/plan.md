@@ -1,178 +1,112 @@
 
 
-# Refactor: Details Panel - Clean Up, Auto-scroll, Add Button and Section Logic
+## Comprehensive Fix: Backup/Restore, Import/Export, and UI Improvements
 
-## Overview
+### Issues Found
 
-Streamline the expanded details panel by replacing the expand icon, cleaning up columns, fixing sort/scroll behavior, separating completed action items into History, filtering history to only manual logs and status changes, and adding a unified "Add" button with a modal.
+**1. CSV Export Shows Raw UUIDs (Critical UX Issue)**
+All module exporters (Contacts, Accounts, Leads, Deals) output raw UUIDs for user-reference fields (`contact_owner`, `created_by`, `modified_by`, `lead_owner`, `account_owner`, `assigned_to`). The reference files use a `UserNameUtils` class that resolves UUIDs to display names, but this utility was never created in the actual codebase.
+
+**2. Leads Exporter Also Shows Raw UUIDs**
+The `LeadsCSVExporter` has its own custom logic that bypasses `GenericCSVExporter` and outputs UUIDs directly without any name resolution.
+
+**3. Scheduled Backups Don't Actually Run**
+The `backup_schedules` table stores preferences (enabled, frequency, time), but there is no `pg_cron` job configured to actually trigger the `create-backup` edge function. The schedule toggle saves to the database but nothing executes. The `next_run_at` is always null.
+
+**4. Backup "Import" Button is Disabled/Non-functional**
+The "Import Backup File" button on the UI is permanently disabled with text saying "Use the restore option from backup history below." This is confusing -- if there's no file upload capability, the entire Import card is misleading.
+
+**5. Supabase Default 1000-Row Limit in Backups**
+The `create-backup` edge function uses `adminClient.from(table).select('*')` without pagination. Tables with more than 1000 rows (e.g., contacts with 4,402 records) will silently truncate data in backups.
+
+**6. Restore Deletes Everything Then Inserts**
+The restore function deletes all data first, then inserts. If the insert fails partway through, data is lost. There's no pre-restore safety backup.
+
+**7. Missing `contacts_module` in Backup Tables**
+The `BACKUP_TABLES` list in `create-backup` references `contacts` but the actual table name used elsewhere might differ. Need to verify consistency.
+
+**8. UI Layout Issues**
+- The backup history items are too wide and busy with redundant info
+- Module backup cards could be more compact (currently 3-column grid with large padding)
+- Import card takes up half the screen but is non-functional
+- No visual feedback showing backup is complete (the file_name in history is a long timestamp string)
 
 ---
 
-## 1. Replace "Expand Details" icon (DealCard.tsx)
+### Implementation Plan
 
-- Replace `PanelRightOpen` import with `Activity` from lucide-react
-- Update the expand button icon from `<PanelRightOpen>` to `<Activity>`
+#### Step 1: Create `UserNameUtils` Utility Class
+Create `src/utils/userNameUtils.ts` with methods to:
+- `extractUserIds(data, fields?)` -- collect all unique UUIDs from user-reference fields
+- `fetchUserDisplayNames(userIds)` -- call the existing `fetch-user-display-names` edge function to resolve UUIDs to names
+- `isUserField(field)` -- check if field is a user-reference field (`contact_owner`, `created_by`, `modified_by`, `lead_owner`, `account_owner`, `assigned_to`)
+- `isDateTimeField(field)` -- check if field is a datetime field
+- `formatIdForExport(id)` -- shorten UUID for export (first 8 chars)
+- `formatDateTimeForExport(value)` -- human-readable datetime format
+- `resolveUserId(name, userIdMap, fallback)` -- resolve display name back to UUID for import
 
-## 2. Sort newest-at-bottom + auto-scroll (DealExpandedPanel.tsx)
+#### Step 2: Update `GenericCSVExporter` to Resolve UUIDs
+Modify `src/hooks/import-export/genericCSVExporter.ts`:
+- Before building CSV rows, call `UserNameUtils.extractUserIds()` and `UserNameUtils.fetchUserDisplayNames()`
+- For each user-reference field, replace UUID with display name
+- For ID field, use shortened format
+- For datetime fields, use human-readable format
 
-- Change `historySortDirection` default from `'desc'` to `'asc'` (already `'asc'`, but ensure DB query uses `ascending: true` instead of `false`)
-- Change audit log query to `order('created_at', { ascending: true })` so newest items are at the bottom
-- Sort action items by `created_at` ascending
-- Add `useRef` refs for both scroll containers (`historyScrollRef`, `actionItemsScrollRef`)
-- Add `useEffect` that scrolls both containers to bottom (`scrollTop = scrollHeight`) whenever data updates
-- Remove all sort button wrappers and sort icon renders from column headers -- keep plain text headers only
-- Remove `handleHistorySort`, `getHistorySortIcon`, `handleActionItemSort`, `getActionItemSortIcon` functions and related state (`historySortField`, `historySortDirection`, `actionItemSortField`, `actionItemSortDirection`)
+#### Step 3: Update `LeadsCSVExporter` to Resolve UUIDs
+Modify `src/hooks/import-export/leadsCSVExporter.ts`:
+- Add the same UUID-to-name resolution logic
+- Replace raw UUIDs with display names in the output
 
-## 3. Completed action items move to History section (DealExpandedPanel.tsx)
+#### Step 4: Fix Backup Data Truncation (1000-Row Limit)
+Modify `supabase/functions/create-backup/index.ts`:
+- Add pagination logic to fetch ALL records from each table (loop with `.range()` in batches of 1000)
+- This ensures tables with >1000 rows (like contacts with 4,402) are fully backed up
 
-- Split `actionItems` into two filtered lists:
-  - `activeActionItems`: status is "Open" or "In Progress" (displayed in Action Items section)
-  - `completedActionItems`: status is "Completed" or "Cancelled" (merged into History section)
-- In History, merge `filteredSortedLogs` with `completedActionItems` formatted as history-like entries:
-  - `message`: "Task Title - Completed" (or "- Cancelled")
-  - `created_at`: from the action item's `created_at`
-  - `user_id`: from `assigned_to`
-- Sort merged list by `created_at` ascending (newest at bottom)
-- Action Items section only renders `activeActionItems`
+#### Step 5: Add Pre-Restore Safety Backup
+Modify `supabase/functions/restore-backup/index.ts`:
+- Before deleting/restoring, create an automatic "pre-restore" safety backup
+- This allows recovery if the restore goes wrong
 
-## 4. History section -- only show manual logs and action item status updates (DealExpandedPanel.tsx)
+#### Step 6: Fix Scheduled Backup (Actually Make It Work)
+- Update `BackupRestoreSettings.tsx` to compute and save `next_run_at` when enabling the schedule
+- Add a note in the UI explaining that `pg_cron` needs to be set up (or set it up if extensions are available)
+- Update `handleSaveSchedule` to calculate `next_run_at` based on frequency and time_of_day
 
-- Filter `auditLogs` to only include entries where:
-  - `details.manual_entry === true` (user-added logs: Note, Call, Meeting, Email), OR
-  - `details.action_item_title` exists (action item status change logs)
-- This excludes all system-generated deal field change logs (create, update, stage changes, etc.)
+#### Step 7: Redesign the UI for Compactness
 
-## 5. History Section column changes
+**Export/Import Section:**
+- Merge into a single compact card with Export button and a note about restoring from history (remove the misleading disabled Import card)
 
-**Remove**: Type column (the colored dot + label column)
-**Keep**: #, Changes, By, Time, Eye icon
+**Scheduled Backup Section:**
+- Keep as-is but show computed `next_run_at` properly
 
-New header row (plain text, no sort buttons):
-```
-| # | Changes | By | Time | (eye) |
-```
+**Module Backup Section:**
+- Make cards smaller and more compact (reduce padding, use inline layout)
+- Show record count inline with the module name
 
-Column widths adjusted: Changes gets the space freed from removing Type.
+**Backup History Section:**
+- Make each row more compact -- single line with key info
+- Use a proper table layout instead of stacked cards
+- Shorten file names to human-readable format (e.g., "Full Backup" or "Leads Backup" instead of `backup-full-2026-02-10T13-28-45-859Z.json`)
+- Add a delete confirmation that doesn't need a separate dialog
 
-## 6. Action Items Section column changes
+---
 
-**Remove**: Priority column (the priority dot column)
-**Keep**: #, Task, Assigned, Due, Status, Actions (...)
+### Technical Summary
 
-New header row (plain text, no sort buttons):
-```
-| # | Task | Assigned | Due | Status | ... |
-```
+| File | Change |
+|------|--------|
+| `src/utils/userNameUtils.ts` | **New** -- UUID-to-name resolution utility |
+| `src/hooks/import-export/genericCSVExporter.ts` | Resolve UUIDs to display names, format IDs and datetimes |
+| `src/hooks/import-export/leadsCSVExporter.ts` | Resolve UUIDs to display names |
+| `supabase/functions/create-backup/index.ts` | Add pagination to handle >1000 rows per table |
+| `supabase/functions/restore-backup/index.ts` | Add pre-restore safety backup |
+| `src/components/settings/BackupRestoreSettings.tsx` | UI redesign: compact layout, proper schedule handling, cleaner history |
 
-## 7. Status change log format update (DealExpandedPanel.tsx)
-
-In `handleStatusChange`, update the log message format from:
-```
-"Action item status changed: OldStatus -> NewStatus"
-```
-to:
-```
-"TaskTitle -> NewStatus"
-```
-
-This shows only the task name and the updated status (not the old status).
-
-## 8. Date format update
-
-- Verify `formatHistoryDateTime` uses `'HH:mm dd-MM-yy'` (already correct)
-- Update action item due date display from `format(date, 'dd-MMM-yy')` to `format(date, 'HH:mm dd-MM-yy')` where time is available; for date-only values, use `'dd-MM-yy'`
-
-## 9. Add "Add" button in Details header (AnimatedStageHeaders.tsx)
-
-- Replace the "Details" text in the details header with an "Add" button (`Plus` icon + "Add" text)
-- Add a new prop `onAddDetail` callback to `AnimatedStageHeadersProps`
-- Wire the button click to `onAddDetail()`
-
-## 10. Unified "Add Detail" Modal (DealExpandedPanel.tsx)
-
-- Add new state: `addDetailOpen` (boolean), `addDetailType` ('log' | 'action_item')
-- Replace existing "Add Log" dialog with a unified modal:
-  - **Type selector**: Dropdown with "Log" and "Action Item" options
-  - **If "Log" selected**: Show log type dropdown (Note only, simplified) + description textarea
-  - **If "Action Item" selected**: Show Title field (required), with a collapsible "More options" section (collapsed by default) containing: Assigned To dropdown, Due Date input, Priority dropdown, Status dropdown
-- On save:
-  - Log: insert into `security_audit_log` with `manual_entry: true`
-  - Action Item: insert into `action_items` table with `module_type: 'deals'` and `module_id: deal.id`
-- Remove the old `addLogOpen` state and dialog
-
-## Files Modified
-
-1. **`src/components/DealCard.tsx`** -- Replace `PanelRightOpen` with `Activity` icon
-2. **`src/components/DealExpandedPanel.tsx`** -- All section logic changes: filtering, sorting, auto-scroll, column cleanup, merged history, unified Add modal, status change format, date format
-3. **`src/components/kanban/AnimatedStageHeaders.tsx`** -- Replace "Details" header with "Add" button, add `onAddDetail` prop
-
-## Technical Details
-
-**Auto-scroll implementation:**
-```tsx
-const historyScrollRef = useRef<HTMLDivElement>(null);
-const actionItemsScrollRef = useRef<HTMLDivElement>(null);
-
-useEffect(() => {
-  setTimeout(() => {
-    if (historyScrollRef.current) {
-      historyScrollRef.current.scrollTop = historyScrollRef.current.scrollHeight;
-    }
-    if (actionItemsScrollRef.current) {
-      actionItemsScrollRef.current.scrollTop = actionItemsScrollRef.current.scrollHeight;
-    }
-  }, 100);
-}, [mergedHistory, activeActionItems]);
-```
-
-**History filtering (manual logs + status changes only):**
-```tsx
-const manualAndStatusLogs = useMemo(() => {
-  return auditLogs.filter(log => {
-    const details = log.details as any;
-    return details?.manual_entry === true || details?.action_item_title;
-  });
-}, [auditLogs]);
-```
-
-**Merged history with completed action items:**
-```tsx
-const mergedHistory = useMemo(() => {
-  const completedAsHistory = completedActionItems.map(item => ({
-    id: `completed-${item.id}`,
-    message: `${item.title} - ${item.status}`,
-    user_id: item.assigned_to,
-    created_at: item.created_at,
-    isCompletedAction: true,
-  }));
-  return [...mappedLogs, ...completedAsHistory]
-    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-}, [manualAndStatusLogs, completedActionItems]);
-```
-
-**Status change log format:**
-```tsx
-// In handleStatusChange:
-message: `${item?.title} → ${status}`,
-```
-
-**Add Detail Modal type switching:**
-```tsx
-<Select value={addDetailType} onValueChange={v => setAddDetailType(v)}>
-  <SelectItem value="log">Log</SelectItem>
-  <SelectItem value="action_item">Action Item</SelectItem>
-</Select>
-
-{addDetailType === 'action_item' && (
-  <>
-    <Input placeholder="Title" value={actionTitle} ... />
-    <Collapsible>
-      <CollapsibleTrigger>More options</CollapsibleTrigger>
-      <CollapsibleContent>
-        {/* Assigned To, Due Date, Priority, Status */}
-      </CollapsibleContent>
-    </Collapsible>
-  </>
-)}
-```
+### Expected Results
+- CSV exports show human-readable names instead of UUIDs
+- Backups capture ALL records (not just first 1000)
+- Restore has safety net (pre-restore backup)
+- Schedule shows proper next run time
+- UI is cleaner and more compact
 
