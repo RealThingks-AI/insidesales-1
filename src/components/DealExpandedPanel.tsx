@@ -577,9 +577,8 @@ const parseChangeSummary = (action: string, details: Record<string, unknown> | n
          className="h-full w-full bg-card border border-border/50 rounded-lg shadow-lg flex flex-col overflow-hidden"
         onKeyDown={(e) => e.key === 'Escape' && onClose()}
       >
-         {/* Header - Simple title only */}
-         <div className="flex items-center justify-between px-3 py-2 border-b border-border/30 bg-muted/30 flex-shrink-0 sticky top-0 z-20">
-           <span className="text-sm font-medium text-muted-foreground">Details</span>
+         {/* Close button - minimal */}
+         <div className="flex items-center justify-end px-3 py-1 flex-shrink-0">
           <Button
             variant="ghost"
             size="sm"
@@ -595,7 +594,7 @@ const parseChangeSummary = (action: string, details: Record<string, unknown> | n
             {/* History Section - Collapsible with flex-1 for equal height */}
             <Collapsible open={historyOpen} onOpenChange={setHistoryOpen} className={`flex flex-col ${historyOpen ? 'flex-1' : ''} min-h-0`}>
               <CollapsibleTrigger asChild>
-               <button className="w-full flex items-center gap-1.5 px-3 py-2 bg-muted/20 hover:bg-muted/40 transition-colors border-b border-border/20 group">
+               <button className="w-full flex items-center gap-1.5 px-3 py-2 bg-muted/20 hover:bg-muted/40 transition-colors border-b border-border/20">
                   {historyOpen ? (
                     <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                   ) : (
@@ -604,34 +603,6 @@ const parseChangeSummary = (action: string, details: Record<string, unknown> | n
                   <History className="h-3.5 w-3.5 text-muted-foreground" />
                   <span className="text-xs font-medium text-foreground">History</span>
                   <span className="text-xs text-muted-foreground ml-1">({filteredSortedLogs.length})</span>
-                  {/* Type filter */}
-                  <div onClick={e => e.stopPropagation()} className="ml-auto">
-                    <Select value={historyTypeFilter} onValueChange={setHistoryTypeFilter}>
-                      <SelectTrigger className="h-5 w-auto min-w-0 text-[10px] border-0 bg-transparent hover:bg-muted/50 px-1.5 gap-1 [&>svg]:h-3 [&>svg]:w-3">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="All">All</SelectItem>
-                        <SelectItem value="Note">Note</SelectItem>
-                        <SelectItem value="Call">Call</SelectItem>
-                        <SelectItem value="Meeting">Meeting</SelectItem>
-                        <SelectItem value="Email">Email</SelectItem>
-                        <SelectItem value="System">System</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-5 px-1.5 text-[10px] gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setAddLogOpen(true);
-                    }}
-                  >
-                    <MessageSquarePlus className="h-3 w-3" />
-                    Add Log
-                  </Button>
                 </button>
               </CollapsibleTrigger>
              <CollapsibleContent className="flex-1 min-h-0 collapsible-content data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
