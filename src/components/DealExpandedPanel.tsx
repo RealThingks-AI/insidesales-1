@@ -577,35 +577,10 @@ const parseChangeSummary = (action: string, details: Record<string, unknown> | n
          className="h-full w-full bg-card border border-border/50 rounded-lg shadow-lg flex flex-col overflow-hidden"
         onKeyDown={(e) => e.key === 'Escape' && onClose()}
       >
-         {/* Close button - minimal */}
-         <div className="flex items-center justify-end px-3 py-1 flex-shrink-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-             className="h-6 w-6 p-0 hover:bg-muted"
-          >
-             <X className="h-4 w-4" />
-          </Button>
-        </div>
-
          {/* Content */}
          <div className="flex-1 min-h-0 flex flex-col overflow-hidden gap-1">
-            {/* History Section - Collapsible with flex-1 for equal height */}
-            <Collapsible open={historyOpen} onOpenChange={setHistoryOpen} className={`flex flex-col ${historyOpen ? 'flex-1' : ''} min-h-0`}>
-              <CollapsibleTrigger asChild>
-               <button className="w-full flex items-center gap-1.5 px-3 py-2 bg-muted/20 hover:bg-muted/40 transition-colors border-b border-border/20">
-                  {historyOpen ? (
-                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                  ) : (
-                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                  )}
-                  <History className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-xs font-medium text-foreground">History</span>
-                  <span className="text-xs text-muted-foreground ml-1">({filteredSortedLogs.length})</span>
-                </button>
-              </CollapsibleTrigger>
-             <CollapsibleContent className="flex-1 min-h-0 collapsible-content data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
+            {/* History Section */}
+            <div className="flex flex-col flex-1 min-h-0">
                 <div className="h-[280px] overflow-y-auto">
                      {isLoading ? (
                        <div className="flex items-center justify-center py-6">
@@ -689,41 +664,12 @@ const parseChangeSummary = (action: string, details: Record<string, unknown> | n
                          </TableBody>
                        </Table>
                      )}
-                 </div>
-              </CollapsibleContent>
-            </Collapsible>
+                </div>
+            </div>
  
-           {/* Action Items Section - Collapsible with flex-1 for equal height */}
-           <Collapsible open={actionsOpen} onOpenChange={setActionsOpen} className={`flex flex-col ${actionsOpen ? 'flex-1' : ''} min-h-0`}>
-             <CollapsibleTrigger asChild>
-              <button className="w-full flex items-center gap-1.5 px-3 py-2 bg-muted/20 hover:bg-muted/40 transition-colors border-b border-border/20 group">
-                 {actionsOpen ? (
-                   <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                 ) : (
-                   <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                 )}
-                 <ListTodo className="h-3.5 w-3.5 text-muted-foreground" />
-                 <span className="text-xs font-medium text-foreground">Action Items</span>
-                 <span className="text-xs text-muted-foreground ml-1">({actionItems.length})</span>
-                 <span
-                   role="button"
-                   tabIndex={0}
-                   onClick={handleAddActionClick}
-                   onKeyDown={(e) => {
-                     if (e.key === "Enter" || e.key === " ") {
-                       e.preventDefault();
-                       handleAddActionClick(e as unknown as React.MouseEvent);
-                     }
-                   }}
-                   className="ml-auto inline-flex h-5 w-5 items-center justify-center rounded hover:bg-muted"
-                   aria-label="Add action item"
-                 >
-                   <Plus className="h-3 w-3 text-muted-foreground" />
-                 </span>
-               </button>
-             </CollapsibleTrigger>
-            <CollapsibleContent className="flex-1 min-h-0 collapsible-content data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
-               <div className="h-[280px] overflow-y-auto">
+           {/* Action Items Section */}
+           <div className="flex flex-col flex-1 min-h-0">
+                <div className="h-[280px] overflow-y-auto">
                     {isLoading ? (
                       <div className="flex items-center justify-center py-6">
                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
@@ -897,8 +843,7 @@ const parseChangeSummary = (action: string, details: Record<string, unknown> | n
                       </Table>
                     )}
                 </div>
-              </CollapsibleContent>
-            </Collapsible>
+            </div>
           </div>
        </div>
  
